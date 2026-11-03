@@ -92,8 +92,9 @@ class FugleMarketDataClient:
             raise ValueError("Fugle API Key is missing. Please set FUGLE_API_KEY in .env or config.ini.")
 
     def _get_headers(self) -> Dict[str, str]:
+        key = os.getenv("FUGLE_BASE64_TOKEN") or self.creds.api_key
         return {
-            "X-API-KEY": self.creds.api_key,
+            "X-API-KEY": key,
             "User-Agent": "AlphaMind-Engine/1.0",
         }
 

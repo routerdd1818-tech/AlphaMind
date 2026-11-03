@@ -1,10 +1,14 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/api/(.*)",
+      "destination": "https://alphamind-api.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -21,7 +25,7 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type"
+          "value": "Content-Type, Authorization, X-AlphaMind-Token"
         }
       ]
     }

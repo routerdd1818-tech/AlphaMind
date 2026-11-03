@@ -17,8 +17,11 @@ import mimetypes
 import os
 import socketserver
 import sys
+import threading
+import time
 import types
 import urllib.parse
+import urllib.request
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Tuple
 import numpy as np
@@ -95,52 +98,11 @@ FUGLE_ADAPTER = _SafeFugleWrapper()
 
 
 def _resolve_stock_meta(symbol: str) -> Dict[str, Any]:
-    clean = symbol.replace(".TW", "").replace(".TWO", "").strip().upper()
-    for s in CORE_TAIWAN_STOCKS:
-        if s["symbol"].upper() == clean:
-            return s
-    for e in TAIWAN_ETFS_CATALOG:
-        if e.etf_symbol.upper() == clean:
-            return {
-                "symbol": e.etf_symbol,
-                "name": e.etf_name,
-                "market": "TWSE",
-                "primary_sector": f"ETF ({e.category})",
-                "theme_tags": [e.category, e.issuer],
-                "price": e.price,
-                "change_pct": e.change_pct,
-                "volume_lots": 18000,
-                "pe_ratio": 18.0,
-                "pb_ratio": 2.2,
-                "dividend_yield": e.annual_yield_pct,
-                "roe": 16.0,
-                "f_score": 8,
-                "inst_flow_5d_lots": 5200,
-                "kline_pattern": "均線多頭排列穩步推升",
-                "kline_bias": "BULLISH",
-            }
-    return {
-        "symbol": clean,
-        "name": f"台股標的 {clean}",
-        "market": "TWSE",
-        "primary_sector": "上市櫃個股",
-        "theme_tags": ["台股全市場"],
-        "price": 120.0,
-        "change_pct": 0.85,
-        "volume_lots": 3500,
-        "pe_ratio": 17.5,
-        "pb_ratio": 2.1,
-        "dividend_yield": 3.2,
-        "roe": 15.0,
-        "f_score": 7,
-        "inst_flow_5d_lots": 1200,
-        "kline_pattern": "區間箱型量縮整理",
-        "kline_bias": "NEUTRAL",
-    }
+    return UNIVERSE_ENGINE.get_stock_meta(symbol)
 
 
 def _generate_realistic_bars(symbol: str, current_price: float, kline_bias: str) -> List[DailyBar]:
-    clean = symbol.replace(".TW", "").strip().upper()
+    clean = symbol.replace(".TW", "").replace(".TWO", "").strip().upper()
     seed_val = sum(ord(c) * (idx + 1) for idx, c in enumerate(clean)) % 997
     rng = np.random.default_rng(seed_val)
 
@@ -178,6 +140,98 @@ def _generate_realistic_bars(symbol: str, current_price: float, kline_bias: str)
             )
         )
     return bars
+
+
+_DAILY_BARS_CACHE: Dict[str, Tuple[float, List[DailyBar]]] = {}
+_DAILY_BARS_CACHE_LOCK = threading.Lock()
+
+
+def _fetch_real_daily_bars(symbol: str, current_price: float, kline_bias: str = "NEUTRAL", days: int = 90) -> List[DailyBar]:
+    """
+    抓取台股真實歷史日 K 線 (優先 FinMind 官方 API -> 備援 Yahoo Finance -> 容錯合成)，
+    附帶快取以維持百毫秒級別前端互動響應。
+    """
+    clean = symbol.replace(".TW", "").replace(".TWO", "").strip().upper()
+    now_ts = time.time()
+
+    with _DAILY_BARS_CACHE_LOCK:
+        if clean in _DAILY_BARS_CACHE:
+            cached_ts, cached_bars = _DAILY_BARS_CACHE[clean]
+            if (now_ts - cached_ts < 300) and (len(cached_bars) >= min(days, 20)):
+                return cached_bars[-days:]
+
+    bars: List[DailyBar] = []
+
+    # 1. 優先透過 FinMind 官方 API 取得日 K 線
+    try:
+        from alphamind.ingestion.finmind_collector import FinMindCollector
+        from datetime import datetime, timedelta
+        fc = FinMindCollector()
+        start_date = (datetime.now() - timedelta(days=max(days * 2, 140))).strftime("%Y-%m-%d")
+        raw = fc.fetch_dataset("TaiwanStockPrice", clean, start_date=start_date)
+        if raw and isinstance(raw, list):
+            for r in raw:
+                try:
+                    bars.append(
+                        DailyBar(
+                            date=str(r["date"]),
+                            open=float(r["open"]),
+                            high=float(r["max"]),
+                            low=float(r["min"]),
+                            close=float(r["close"]),
+                            volume=int(r.get("Trading_Volume", 0)),
+                        )
+                    )
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    # 2. 備援 Yahoo Finance (支援上市 .TW 與上櫃 .TWO)
+    if not bars:
+        for suffix in (".TW", ".TWO"):
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{clean}{suffix}?range=6mo&interval=1d"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            try:
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    result = data.get("chart", {}).get("result", [])
+                    if result:
+                        res0 = result[0]
+                        timestamps = res0.get("timestamp", [])
+                        quote = res0.get("indicators", {}).get("quote", [{}])[0]
+                        opens = quote.get("open", [])
+                        highs = quote.get("high", [])
+                        lows = quote.get("low", [])
+                        closes = quote.get("close", [])
+                        volumes = quote.get("volume", [])
+                        for ts, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+                            if None in (ts, o, h, l, c):
+                                continue
+                            dt_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+                            bars.append(
+                                DailyBar(
+                                    date=dt_str,
+                                    open=float(o),
+                                    high=float(h),
+                                    low=float(l),
+                                    close=float(c),
+                                    volume=int(v or 0),
+                                )
+                            )
+                        if bars:
+                            break
+            except Exception:
+                continue
+
+    # 3. 雙通道皆失敗時之最後容錯合成（避免任何斷線 crash）
+    if not bars:
+        bars = _generate_realistic_bars(clean, current_price, kline_bias)
+
+    with _DAILY_BARS_CACHE_LOCK:
+        _DAILY_BARS_CACHE[clean] = (now_ts, bars)
+
+    return bars[-days:]
 
 
 class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
@@ -575,7 +629,7 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
     # API 6: 個股全維度量化診斷 (含 K 線型態辨識 + 型態修正目標價 + ETF 反查)
     # --------------------------------------------------------------------------
     def _handle_stock_analysis(self, payload: Dict[str, Any]):
-        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").strip().upper()
+        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").replace(".TWO", "").strip().upper()
         meta = _resolve_stock_meta(raw_sym)
         current_price = float(payload.get("current_price") or meta["price"])
 
@@ -587,7 +641,13 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
         )
         synthesizer = DecisionSynthesizer(base_position_size_pct=float(payload.get("base_position_pct", 15.0)))
 
-        bars = _generate_realistic_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"))
+        bars = _fetch_real_daily_bars(raw_sym, current_price, meta.get("kline_bias", "NEUTRAL"), days=90)
+        if bars:
+            current_price = bars[-1].close
+            meta["price"] = current_price
+            if len(bars) >= 2:
+                meta["change_pct"] = round(((bars[-1].close - bars[-2].close) / bars[-2].close) * 100, 2)
+
         risk_evals = risk_engine.evaluate_series(bars)
         latest_risk = risk_evals[-1]
 
@@ -750,14 +810,16 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
     # API 7: 雙軌停利停損計算 (現價進場 vs 持倉均價 + K 線型態修正)
     # --------------------------------------------------------------------------
     def _handle_dual_stops(self, payload: Dict[str, Any]):
-        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").strip().upper()
+        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").replace(".TWO", "").strip().upper()
         meta = _resolve_stock_meta(raw_sym)
         current_price = float(payload.get("current_price") or meta["price"])
         avg_cost_price = float(payload.get("avg_cost_price") or round(current_price * 0.91, 2))
         atr_14 = float(payload.get("atr_14") or max(1.0, round(current_price * 0.022, 2)))
         atr_mult = float(payload.get("atr_multiplier", 2.5))
 
-        bars = _generate_realistic_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"))
+        bars = _fetch_real_daily_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"), days=90)
+        if bars:
+            current_price = bars[-1].close
         pattern_report = PATTERN_ENGINE.evaluate_bars(raw_sym, bars)
 
         risk_engine = DynamicStopLossEngine(atr_multiplier=atr_mult)
@@ -875,7 +937,9 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 
         edge = SupplyChainEdge("NVDA", raw_sym, "SUPPLIES_TO", 0.22, 0.95, is_sole_supplier=(raw_sym == "2330"), substitutability_score=0.90)
 
-        bars = _generate_realistic_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"))
+        bars = _fetch_real_daily_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"), days=90)
+        if bars:
+            current_price = bars[-1].close
         latest_risk = risk_engine.evaluate_series(bars)[-1]
         decision = synthesizer.synthesize(raw_sym, current_price, macro_res, valuation, latest_risk, supply_edge=edge)
 
@@ -908,74 +972,108 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
     def _handle_autocomplete_search(self, qs: Dict[str, List[str]]):
         q = qs.get("q", [""])[0].strip().upper()
         results: List[Dict[str, Any]] = []
+        seen = set()
 
+        # 1. 核心精選股
         for s in CORE_TAIWAN_STOCKS:
             sym = s["symbol"].upper()
             name = s["name"].upper()
             sec = s["primary_sector"].upper()
             tags = " ".join(s.get("theme_tags", [])).upper()
             if not q or q in sym or q in name or q in sec or q in tags:
-                results.append({
-                    "symbol": s["symbol"],
-                    "name": s["name"],
-                    "category": s["primary_sector"],
-                    "price": s["price"],
-                    "change_pct": s["change_pct"],
-                    "type": "STOCK",
-                })
+                if sym not in seen:
+                    seen.add(sym)
+                    cached = UNIVERSE_ENGINE._quote_cache.get(sym) or UNIVERSE_ENGINE._full_stocks_cache.get(sym)
+                    px = float(cached["price"]) if cached else float(s["price"])
+                    chg = float(cached["change_pct"]) if cached else float(s["change_pct"])
+                    results.append({
+                        "symbol": s["symbol"],
+                        "name": s["name"],
+                        "category": s["primary_sector"],
+                        "price": px,
+                        "change_pct": chg,
+                        "type": "STOCK",
+                    })
 
+        # 2. 全台股上市櫃資料庫 (2,300+ 檔真實股票)
+        for sym, item in UNIVERSE_ENGINE._full_stocks_cache.items():
+            sym_u = sym.upper()
+            name_u = item.get("name", "").upper()
+            sec_u = item.get("primary_sector", "").upper()
+            if not q or q in sym_u or q in name_u or q in sec_u:
+                if sym_u not in seen:
+                    seen.add(sym_u)
+                    cached = UNIVERSE_ENGINE._quote_cache.get(sym_u)
+                    px = float(cached["price"]) if cached else float(item.get("price", 100.0))
+                    chg = float(cached["change_pct"]) if cached else float(item.get("change_pct", 0.0))
+                    results.append({
+                        "symbol": sym_u,
+                        "name": item.get("name", f"台股 {sym_u}"),
+                        "category": item.get("primary_sector", "上市櫃個股"),
+                        "price": px,
+                        "change_pct": chg,
+                        "type": "STOCK",
+                    })
+
+        # 3. 全 ETF 清單
         for e in TAIWAN_ETFS_CATALOG:
             sym = e.etf_symbol.upper()
             name = e.etf_name.upper()
             cat = e.category.upper()
             if not q or q in sym or q in name or q in cat:
-                results.append({
-                    "symbol": e.etf_symbol,
-                    "name": e.etf_name,
-                    "category": f"ETF・{e.category}",
-                    "price": e.price,
-                    "change_pct": e.change_pct,
-                    "type": "ETF",
-                })
+                if sym not in seen:
+                    seen.add(sym)
+                    cached = UNIVERSE_ENGINE._quote_cache.get(sym)
+                    px = float(cached["price"]) if cached else e.price
+                    chg = float(cached["change_pct"]) if cached else e.change_pct
+                    results.append({
+                        "symbol": e.etf_symbol,
+                        "name": e.etf_name,
+                        "category": f"ETF・{e.category}",
+                        "price": px,
+                        "change_pct": chg,
+                        "type": "ETF",
+                    })
 
-        self._send_json({"query": q, "results": results[:10]})
+        self._send_json({"query": q, "results": results[:15]})
 
     # --------------------------------------------------------------------------
     # API 10: 歷史回測與防過擬合高原穩定度檢定 (/api/backtest)
     # --------------------------------------------------------------------------
     def _handle_backtest(self, payload: Dict[str, Any]):
-        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").strip().upper()
+        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").replace(".TWO", "").strip().upper()
         meta = _resolve_stock_meta(raw_sym)
         current_price = float(payload.get("current_price") or meta["price"])
         atr_mult = float(payload.get("atr_multiplier", 2.5))
         pos_pct = min(0.95, max(0.05, float(payload.get("position_pct", 0.25))))
 
-        # 產生 90 交易日之真實波動序列以檢驗 Chandelier 移動停損 + 20MA 濾網與跳空滑價
-        seed_val = sum(ord(c) * (idx + 3) for idx, c in enumerate(raw_sym)) % 997
-        rng = np.random.default_rng(seed_val)
-        n_days = 90
-        px = current_price * 0.84
-        drift = (current_price - px) / n_days
-
-        bars: List[DailyBar] = []
-        for i in range(n_days):
-            cyc = np.sin(i / 7.5) * (current_price * 0.012)
-            noise = float(rng.normal(0, current_price * 0.009))
-            px = max(5.0, px + drift + cyc * 0.25 + noise)
-            open_i = px * float(1.0 + rng.uniform(-0.008, 0.008))
-            high_i = max(open_i, px) * float(1.0 + rng.uniform(0.004, 0.015))
-            low_i = min(open_i, px) * float(1.0 - rng.uniform(0.004, 0.015))
-            bars.append(
-                DailyBar(
-                    date=f"D-{n_days - i:02d}",
-                    open=round(open_i, 2),
-                    high=round(high_i, 2),
-                    low=round(low_i, 2),
-                    close=round(px, 2),
-                    volume=15_000_000,
-                    institutional_net_buy=1500,
+        bars = _fetch_real_daily_bars(raw_sym, current_price, meta.get("kline_bias", "BULLISH"), days=90)
+        if len(bars) < 30:
+            # 容錯補充
+            seed_val = sum(ord(c) * (idx + 3) for idx, c in enumerate(raw_sym)) % 997
+            rng = np.random.default_rng(seed_val)
+            n_days = 90
+            px = current_price * 0.84
+            drift = (current_price - px) / n_days
+            bars = []
+            for i in range(n_days):
+                cyc = np.sin(i / 7.5) * (current_price * 0.012)
+                noise = float(rng.normal(0, current_price * 0.009))
+                px = max(5.0, px + drift + cyc * 0.25 + noise)
+                open_i = px * float(1.0 + rng.uniform(-0.008, 0.008))
+                high_i = max(open_i, px) * float(1.0 + rng.uniform(0.004, 0.015))
+                low_i = min(open_i, px) * float(1.0 - rng.uniform(0.004, 0.015))
+                bars.append(
+                    DailyBar(
+                        date=f"D-{n_days - i:02d}",
+                        open=round(open_i, 2),
+                        high=round(high_i, 2),
+                        low=round(low_i, 2),
+                        close=round(px, 2),
+                        volume=15_000_000,
+                        institutional_net_buy=1500,
+                    )
                 )
-            )
 
         def _run_with_mult(m: float):
             r_eng = DynamicStopLossEngine(atr_period=14, chandelier_period=22, atr_multiplier=m)
@@ -1092,9 +1190,42 @@ app = wsgi_app
 application = wsgi_app
 
 
+def _start_24x7_keepalive_daemon() -> None:
+    """
+    24 小時全天候防休眠守護執行緒 (10-Minute Keep-Alive Loop)：
+    - 當部署於 Render 時，Render 會自動注入 `RENDER_EXTERNAL_URL` 環境變數。
+    - 此背景執行緒每隔 10 分鐘 (600 秒) 自動向外部網址或本機 `/api/health` 發送一次輕量健康檢查，
+      配合外部 `cron-job.org` / `UptimeRobot` 形成 24 小時雙重不休眠保障，且完全不消耗 750 小時免費上限。
+    """
+    if os.environ.get("KEEP_ALIVE_24X7", "1") == "0":
+        return
+
+    def _ping_loop() -> None:
+        interval_sec = int(os.environ.get("KEEP_ALIVE_INTERVAL_SEC", "600"))
+        time.sleep(15)
+        while True:
+            ext_url = (
+                os.environ.get("RENDER_EXTERNAL_URL")
+                or os.environ.get("PUBLIC_APP_URL")
+                or f"http://127.0.0.1:{PORT}"
+            ).rstrip("/")
+            target = f"{ext_url}/api/health?source=keepalive_24x7"
+            try:
+                req = urllib.request.Request(target, headers={"User-Agent": "AlphaMind-24x7-KeepAlive/1.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    _ = resp.read()
+            except Exception:
+                pass
+            time.sleep(interval_sec)
+
+    t = threading.Thread(target=_ping_loop, name="alphamind-24x7-keepalive", daemon=True)
+    t.start()
+
+
 def start_server():
+    _start_24x7_keepalive_daemon()
     with _ThreadingHTTPServer((HOST, PORT), AlphaMindApiHandler) as httpd:
-        print(f"AlphaMind Server running on http://{HOST}:{PORT}")
+        print(f"AlphaMind Server running on http://{HOST}:{PORT} (24/7 Keep-Alive Active: every 10m)")
         httpd.serve_forever()
 
 

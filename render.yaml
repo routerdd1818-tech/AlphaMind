@@ -9,6 +9,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
+      - key: KEEP_ALIVE_24X7
+        value: "1"
+      - key: KEEP_ALIVE_INTERVAL_SEC
+        value: "600"
       - key: FUGLE_API_KEY
         sync: false
       - key: FUGLE_API_SECRET
@@ -16,4 +20,8 @@ services:
       - key: FINMIND_API_TOKEN
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
         sync: false

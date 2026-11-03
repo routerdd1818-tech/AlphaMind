@@ -4,26 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>AlphaMind — 台股量化選股・ETF 專區・資產持倉管理</title>
+  <!-- Google Fonts: Plus Jakarta Sans & Noto Sans TC (Toss Design System Typography) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-canvas: #F6F7F9;
       --bg-surface: #FFFFFF;
-      --bg-subtle: #F1F3F7;
+      --bg-subtle: #F0F2F6;
       --text-primary: #191F28;
       --text-secondary: #4E5968;
       --text-muted: #8B95A1;
       --border-color: #EAEDF2;
       --brand-blue: #2563EB;
-      --brand-blue-soft: #EFF6FF;
-      --up-color: #DC2626;
-      --up-bg: #FEF2F2;
-      --down-color: #16A34A;
-      --down-bg: #F0FDF4;
+      --brand-blue-hover: #1D4ED8;
+      --brand-blue-soft: rgba(37, 99, 235, 0.08);
+      --up-color: #F04452;
+      --up-bg: rgba(240, 68, 82, 0.08);
+      --down-color: #059669;
+      --down-bg: rgba(5, 150, 105, 0.08);
       --warn-color: #D97706;
       --warn-bg: #FFFBEB;
-      --radius-lg: 14px;
-      --radius-md: 10px;
-      --radius-sm: 6px;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
 
     * {
@@ -39,7 +45,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Noto Sans TC", sans-serif;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
       background-color: var(--bg-canvas);
       color: var(--text-primary);
       line-height: 1.5;
@@ -58,7 +64,8 @@
       top: 0;
       z-index: 100;
       background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-color);
     }
 
@@ -69,29 +76,30 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 12px;
     }
 
     .brand-group {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-shrink: 0;
       cursor: pointer;
     }
 
     .brand-mark {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
       background: var(--brand-blue);
       color: #FFFFFF;
-      font-weight: 700;
-      font-size: 13px;
+      font-weight: 800;
+      font-size: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.04em;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
     }
 
     .brand-title {
@@ -101,21 +109,32 @@
       color: var(--text-primary);
     }
 
-    /* Desktop Navigation Tabs */
+    .brand-subtitle-chip {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 6px;
+    }
+
+    /* Desktop Navigation Tabs - FinanceLife Toss Segmented Control */
     .desktop-nav {
       display: flex;
-      gap: 4px;
+      align-items: center;
+      gap: 2px;
       background: var(--bg-subtle);
-      padding: 4px;
-      border-radius: 10px;
+      padding: 3px 4px;
+      border-radius: 12px;
     }
 
     .nav-btn {
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      padding: 7px 14px;
-      border-radius: 7px;
+      padding: 7px 15px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -126,10 +145,15 @@
       white-space: nowrap;
     }
 
+    .nav-btn:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
     .nav-btn.active {
       background: var(--bg-surface);
-      color: var(--brand-blue);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      font-weight: 700;
     }
 
     .topbar-right {
@@ -144,8 +168,8 @@
     .viewport-status {
       display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 5px 9px;
+      gap: 6px;
+      padding: 6px 10px;
       background: var(--bg-subtle);
       border-radius: 999px;
       font-size: 12px;
@@ -157,8 +181,14 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #16A34A;
+      background: var(--down-color);
       flex-shrink: 0;
+      animation: pulseAnim 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseAnim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
     }
 
     .quick-search {
@@ -170,19 +200,22 @@
     }
 
     .input-sm {
-      padding: 7px 10px;
+      padding: 7px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 13px;
-      background: var(--bg-surface);
+      background: var(--bg-canvas);
       color: var(--text-primary);
       outline: none;
-      width: 155px;
+      width: 160px;
       max-width: 100%;
+      transition: all 0.15s ease;
     }
 
     .input-sm:focus {
+      background: var(--bg-surface);
       border-color: var(--brand-blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
     /* Autocomplete Search Dropdown */
@@ -191,12 +224,12 @@
       position: absolute;
       top: calc(100% + 6px);
       right: 0;
-      width: 270px;
-      max-height: 320px;
+      width: 290px;
+      max-height: 340px;
       overflow-y: auto;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: 14px;
       box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
       z-index: 200;
       padding: 6px;
@@ -210,8 +243,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 9px 10px;
-      border-radius: 8px;
+      padding: 9px 12px;
+      border-radius: 9px;
       cursor: pointer;
       transition: background 0.12s;
     }
@@ -224,17 +257,21 @@
       border: 1px solid transparent;
       background: var(--brand-blue);
       color: #FFFFFF;
-      padding: 7px 12px;
-      border-radius: 8px;
+      padding: 8px 14px;
+      border-radius: 10px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: opacity 0.15s;
+      transition: all 0.15s ease;
       white-space: nowrap;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      background: var(--brand-blue-hover);
     }
 
     .btn:active {
@@ -249,15 +286,16 @@
 
     .btn-ghost:hover {
       background: var(--bg-subtle);
+      border-color: #D1D5DB;
     }
 
     .btn-xs {
       padding: 5px 10px;
       font-size: 12px;
-      border-radius: 6px;
+      border-radius: 8px;
     }
 
-    /* Mobile Fixed 5-Tab Bottom Bar */
+    /* Mobile Fixed 5-Tab Bottom Bar (FinanceLife Toss PWA Navigation) */
     .mobile-bottom-nav {
       display: none;
       position: fixed;
@@ -265,11 +303,14 @@
       left: 0;
       right: 0;
       z-index: 120;
-      background: rgba(255, 255, 255, 0.98);
-      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-top: 1px solid var(--border-color);
-      padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+      height: 64px;
+      padding: 0 4px calc(env(safe-area-inset-bottom, 0px));
       grid-template-columns: repeat(5, 1fr);
+      align-items: center;
     }
 
     .mob-tab {
@@ -281,11 +322,12 @@
       align-items: center;
       justify-content: center;
       gap: 3px;
-      padding: 5px 0;
+      height: 100%;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
       position: relative;
+      transition: color 0.15s ease;
     }
 
     .mob-tab svg {
@@ -294,18 +336,26 @@
       stroke: currentColor;
       fill: none;
       stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.15s ease;
+    }
+
+    .mob-tab:active svg {
+      transform: scale(0.92);
     }
 
     .mob-tab.active {
       color: var(--brand-blue);
+      font-weight: 700;
     }
 
     .mob-badge-dot {
       position: absolute;
-      top: 2px;
+      top: 6px;
       right: 22%;
-      min-width: 15px;
-      height: 15px;
+      min-width: 16px;
+      height: 16px;
       padding: 0 4px;
       border-radius: 999px;
       background: var(--up-color);
@@ -344,40 +394,45 @@
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 16px;
+      padding: 18px;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.15s ease;
     }
 
     .card-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      margin-bottom: 12px;
-      gap: 10px;
+      margin-bottom: 14px;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
     .card-title {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--text-primary);
+      letter-spacing: -0.01em;
     }
 
     .card-subtitle {
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: 2px;
+      margin-top: 3px;
     }
 
     .kpi-label {
       font-size: 12px;
+      font-weight: 500;
       color: var(--text-secondary);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
 
     .kpi-value {
-      font-size: 21px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
     }
 
     .kpi-sub {
@@ -386,14 +441,18 @@
       margin-top: 4px;
     }
 
-    /* Segmented Pill Filters */
+    /* Segmented Pill Filters (FinanceLife Toss Style) */
     .pill-bar {
-      display: flex;
-      gap: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-subtle);
+      padding: 3px 4px;
+      border-radius: 12px;
       overflow-x: auto;
-      padding-bottom: 4px;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      max-width: 100%;
     }
 
     .pill-bar::-webkit-scrollbar {
@@ -401,23 +460,28 @@
     }
 
     .pill {
-      border: 1px solid var(--border-color);
-      background: var(--bg-surface);
+      border: none;
+      background: transparent;
       color: var(--text-secondary);
-      padding: 6px 12px;
-      border-radius: 999px;
+      padding: 6px 14px;
+      border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
       flex-shrink: 0;
     }
 
+    .pill:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
     .pill.active {
-      background: var(--brand-blue);
-      color: #FFFFFF;
-      border-color: var(--brand-blue);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      font-weight: 700;
     }
 
     /* Grid Layouts */
@@ -453,12 +517,18 @@
 
     .m-card {
       border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 13px;
+      border-radius: var(--radius-lg);
+      padding: 15px;
       background: var(--bg-surface);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.1s ease;
+    }
+
+    .m-card:active {
+      transform: scale(0.99);
     }
 
     .m-card-top {
@@ -466,6 +536,7 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 8px;
+      cursor: pointer;
     }
 
     .m-card-metrics {
@@ -473,19 +544,20 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       background: var(--bg-subtle);
-      padding: 9px 10px;
-      border-radius: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
       font-size: 12px;
     }
 
     .m-metric-lbl {
       font-size: 11px;
       color: var(--text-muted);
+      font-weight: 500;
     }
 
     .m-metric-val {
       font-weight: 700;
-      margin-top: 1px;
+      margin-top: 2px;
     }
 
     .m-card-actions {
@@ -504,13 +576,13 @@
       font-size: 12px;
       font-weight: 600;
       color: var(--text-muted);
-      padding: 10px 8px;
+      padding: 10px 10px;
       border-bottom: 1px solid var(--border-color);
       white-space: nowrap;
     }
 
     td {
-      padding: 11px 8px;
+      padding: 11px 10px;
       border-bottom: 1px solid var(--border-color);
       font-size: 13px;
       vertical-align: middle;
@@ -533,10 +605,10 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      padding: 2px 8px;
+      padding: 3px 8px;
       border-radius: 6px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       white-space: nowrap;
     }
 
@@ -567,12 +639,12 @@
 
     .text-up {
       color: var(--up-color);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .text-down {
       color: var(--down-color);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .quote-flash {
@@ -616,9 +688,12 @@
       position: fixed;
       inset: 0;
       background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       z-index: 300;
       align-items: flex-end;
       justify-content: center;
+      transition: opacity 0.2s ease;
     }
 
     .sheet-backdrop.open {
@@ -628,13 +703,13 @@
     .bottom-sheet {
       background: var(--bg-surface);
       width: 100%;
-      max-width: 540px;
-      border-radius: 18px 18px 0 0;
-      padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
-      max-height: 90vh;
+      max-width: 600px;
+      border-radius: 24px 24px 0 0;
+      padding: 18px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+      max-height: 92vh;
       overflow-y: auto;
-      box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.16);
-      animation: slideUp 0.2s ease-out;
+      box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.16);
+      animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     @media (min-width: 769px) {
@@ -642,8 +717,9 @@
         align-items: center;
       }
       .bottom-sheet {
-        border-radius: 16px;
-        padding: 20px;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
       }
     }
 
@@ -653,7 +729,7 @@
     }
 
     .sheet-handle {
-      width: 38px;
+      width: 36px;
       height: 4px;
       background: #D1D5DB;
       border-radius: 999px;
@@ -680,18 +756,21 @@
     }
 
     .field-input {
-      padding: 8px 10px;
+      padding: 8px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
-      background: var(--bg-surface);
+      background: var(--bg-canvas);
       color: var(--text-primary);
       width: 100%;
       outline: none;
+      transition: all 0.15s ease;
     }
 
     .field-input:focus {
+      background: var(--bg-surface);
       border-color: var(--brand-blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
     /* Full-Screen Mandatory Login Gate Overlay */
@@ -896,27 +975,30 @@
     <div class="topbar-inner">
       <div class="brand-group" onclick="switchTab('screener')">
         <div class="brand-mark">AM</div>
-        <div class="brand-title">AlphaMind</div>
+        <div style="display:flex; align-items:center;">
+          <div class="brand-title">AlphaMind</div>
+          <span class="brand-subtitle-chip hide-mobile">量化選股 · 智慧資產</span>
+        </div>
       </div>
 
-      <!-- Desktop Navigation -->
+      <!-- Desktop Navigation - Toss Segmented Control -->
       <nav class="desktop-nav">
-        <button class="nav-btn active" data-tab="screener" onclick="switchTab('screener')">選股與族群</button>
-        <button class="nav-btn" data-tab="diagnosis" onclick="switchTab('diagnosis')">個股與型態</button>
-        <button class="nav-btn" data-tab="etf" onclick="switchTab('etf')">台灣 ETF 專區</button>
+        <button class="nav-btn active" data-tab="screener" onclick="switchTab('screener')">選股族群</button>
+        <button class="nav-btn" data-tab="diagnosis" onclick="switchTab('diagnosis')">個股型態</button>
+        <button class="nav-btn" data-tab="etf" onclick="switchTab('etf')">ETF專區</button>
         <button class="nav-btn" data-tab="portfolio" onclick="switchTab('portfolio')">
-          資產與持倉
+          資產持倉
           <span id="navAlertBadge" class="badge badge-up num" style="display:none; margin-left:4px;">0</span>
         </button>
-        <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')">總經與設定</button>
+        <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')">總經設定</button>
       </nav>
 
       <!-- Viewport On-Demand Quote Status, User Account Chip & Instant Autocomplete Search -->
       <div class="topbar-right">
-        <div class="viewport-status" title="僅針對畫面可視範圍內之股票進行報價更新，保護 API 呼叫額度">
+        <div class="viewport-status" title="即時盤中連線與可視範圍報價更新">
           <span class="pulse-dot"></span>
-          <span class="hide-mobile">可視報價</span>
-          <span id="viewportCounter" class="num" style="font-weight:600;">0 檔</span>
+          <span class="hide-mobile">即時報價</span>
+          <span id="viewportCounter" class="num" style="font-weight:700;">0 檔</span>
         </div>
         <div class="quick-search">
           <input
@@ -928,12 +1010,13 @@
             autocomplete="off"
             oninput="handleGlobalSearchInput(this.value)"
             onfocus="handleGlobalSearchInput(this.value)"
-            onkeydown="if(event.key==='Enter'){ closeSearchDropdown(); jumpToDiagnosis(); }"
+            onkeydown="if(event.key==='Enter'){ closeSearchDropdown(); openStockDrawer(this.value); }"
           />
-          <button class="btn btn-xs" style="padding:7px 11px;" onclick="closeSearchDropdown(); jumpToDiagnosis();">診斷</button>
+          <button class="btn btn-xs" style="padding:7px 11px;" onclick="closeSearchDropdown(); openStockDrawer(document.getElementById('globalSymbolInput').value);">查詢</button>
           <div id="searchDropdown" class="search-dropdown"></div>
         </div>
-        <div id="topbarUserChip" class="user-chip" onclick="switchTab('settings')" title="點擊管理或切換使用者帳號">
+        <div id="topbarUserChip" class="user-chip" onclick="switchTab('settings')" title="點擊切換或管理使用者金庫">
+          <svg style="width:14px; height:14px; color:var(--brand-blue);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span id="topbarUserName">未登入</span>
         </div>
       </div>
@@ -1072,13 +1155,36 @@
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title">日 K 線結構、月線頸線與 ATR Chandelier 移動停損線</div>
-              <div class="card-subtitle">紅/綠 K 線搭配藍色虛線動態停損與橘色虛線頸線支撐</div>
+              <div class="card-title">日 K 線走勢、動態停損與頸線支撐</div>
+              <div class="card-subtitle">滑鼠/手指按住可左右平移拖曳歷史日 K，滾輪/手勢縮放</div>
             </div>
             <span id="diagPatternRegimeBadge" class="badge badge-blue">多頭續航突破</span>
           </div>
 
-          <div id="klineChartContainer" style="width:100%; height:225px; margin-bottom:12px;"></div>
+          <!-- K 線互動控制列與圖例 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <button type="button" class="pill active" id="btnKline30" style="padding:4px 10px; font-size:11px;" onclick="setKlineRange(30)">近 30 日</button>
+              <button type="button" class="pill" id="btnKline60" style="padding:4px 10px; font-size:11px;" onclick="setKlineRange(60)">近 60 日</button>
+              <button type="button" class="pill" id="btnKlineAll" style="padding:4px 10px; font-size:11px;" onclick="setKlineRange(90)">全部 (90日)</button>
+              <button type="button" class="btn btn-ghost btn-xs" style="padding:4px 8px; font-size:11px;" onclick="resetKlinePan()" title="重設平移位置回到最新一根 K 線">回到最新</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap;">
+              <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:8px; height:8px; background:#D97706; border-radius:1px;"></span>MA5</span>
+              <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:8px; height:8px; background:#8B5CF6; border-radius:1px;"></span>MA20</span>
+              <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:10px; height:2px; background:#2563EB;"></span>停損線</span>
+              <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:10px; height:2px; background:#F59E0B;"></span>頸線</span>
+            </div>
+          </div>
+
+          <!-- OHLC 十字準心浮動報價資訊 (HUD) -->
+          <div id="klineHudBar" class="num" style="min-height:24px; margin-bottom:8px; font-size:11px; color:var(--text-secondary); background:var(--bg-subtle); padding:4px 8px; border-radius:6px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border:1px solid var(--border-color);">
+            <span>提示：滑鼠按住或手機單指按住<strong>左右拖曳</strong>可平移查看過去歷史 K 線</span>
+          </div>
+
+          <div id="klineChartContainer" style="width:100%; height:255px; margin-bottom:12px; position:relative; touch-action:none;">
+            <canvas id="klineCanvas" style="width:100%; height:100%; display:block; cursor:crosshair;"></canvas>
+          </div>
 
           <!-- K 線型態轉變與預測修正面板 -->
           <div style="background:var(--bg-subtle); border-radius:var(--radius-md); padding:12px;">
@@ -1620,28 +1726,171 @@
     </div>
   </div>
 
-  <!-- Mobile Fixed 5-Tab Bottom Navigation -->
+  <!-- ===================================================================== -->
+  <!-- Stock Detail Bottom Sheet Drawer (FinanceLife Multi-Tab Drawer)      -->
+  <!-- ===================================================================== -->
+  <div id="stockDrawerBackdrop" class="sheet-backdrop" onclick="if(event.target===this) closeStockDrawer()">
+    <div class="bottom-sheet" style="max-width: 620px;">
+      <div class="sheet-handle"></div>
+
+      <!-- Drawer Header -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <h2 id="drawerStockName" style="font-size:18px; font-weight:800; color:var(--text-primary);">台積電</h2>
+            <span id="drawerStockSymbol" class="num" style="font-size:14px; font-weight:700; color:var(--text-muted);">2330</span>
+            <span id="drawerStockSector" class="badge badge-neutral">半導體</span>
+            <span class="badge" style="background:rgba(5, 150, 105, 0.1); color:var(--down-color); display:inline-flex; align-items:center; gap:4px;">
+              <span class="pulse-dot" style="width:6px; height:6px;"></span>
+              <span>盤中即時</span>
+            </span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:8px; margin-top:4px;" class="num">
+            <span id="drawerStockPrice" style="font-size:24px; font-weight:800; color:var(--text-primary);">1,050.0</span>
+            <span id="drawerStockChange" class="badge badge-up" style="font-size:13px; font-weight:700;">+1.94%</span>
+            <span id="drawerStockLiveMeta" style="font-size:11px; color:var(--text-muted); margin-left:4px;">開 1045.0 | 高 1055.0 | 低 1040.0</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button type="button" class="btn btn-ghost btn-xs" onclick="refreshDrawerQuote()" title="手動刷新最新報價" style="padding:6px 9px;">
+            <svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+          </button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="closeStockDrawer()" style="padding:6px 9px; font-weight:700;">✕</button>
+        </div>
+      </div>
+
+      <!-- Quick AI Summary Banner -->
+      <div id="drawerAiBanner" style="background:var(--brand-blue-soft); border:1px solid #BFDBFE; border-radius:12px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span id="drawerDecisionBadge" class="badge badge-up" style="font-weight:700;">STRONG_BUY</span>
+          <span id="drawerPositionAdvice" style="font-size:12px; font-weight:600; color:var(--brand-blue);">建議配置 18%</span>
+        </div>
+        <div id="drawerPatternNote" style="font-size:12px; color:var(--text-secondary); font-weight:500;">
+          多頭吞噬突破・風報比 3.2x
+        </div>
+      </div>
+
+      <!-- Segmented Pill Tabs in Drawer -->
+      <div class="pill-bar" style="margin-bottom:14px; width:100%; display:grid; grid-template-columns:repeat(4, 1fr); text-align:center;">
+        <button id="drawerTabKlineBtn" class="pill active" onclick="switchDrawerTab('kline')">📈 日 K 走勢</button>
+        <button id="drawerTabAiBtn" class="pill" onclick="switchDrawerTab('ai')">🧠 AI 決策</button>
+        <button id="drawerTabLadderBtn" class="pill" onclick="switchDrawerTab('ladder')">🧭 風控階梯</button>
+        <button id="drawerTabFundBtn" class="pill" onclick="switchDrawerTab('fund')">📊 財務籌碼</button>
+      </div>
+
+      <!-- Drawer Tab 1: K-Line Canvas & HUD -->
+      <div id="drawerTabKline" style="display:block;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button type="button" class="pill active" id="btnDrawerK30" style="padding:3px 9px; font-size:11px;" onclick="setDrawerKlineRange(30)">30 日</button>
+            <button type="button" class="pill" id="btnDrawerK60" style="padding:3px 9px; font-size:11px;" onclick="setDrawerKlineRange(60)">60 日</button>
+            <button type="button" class="pill" id="btnDrawerKAll" style="padding:3px 9px; font-size:11px;" onclick="setDrawerKlineRange(90)">全部</button>
+            <button type="button" class="btn btn-ghost btn-xs" style="padding:3px 7px; font-size:11px;" onclick="resetDrawerKlinePan()">回到最新</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary);">
+            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:6px; height:6px; background:#D97706; border-radius:1px;"></span>MA5</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:6px; height:6px; background:#8B5CF6; border-radius:1px;"></span>MA20</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:8px; height:2px; background:#2563EB;"></span>停損線</span>
+          </div>
+        </div>
+
+        <div id="drawerKlineHudBar" class="num" style="min-height:22px; margin-bottom:8px; font-size:11px; color:var(--text-secondary); background:var(--bg-subtle); padding:4px 8px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <span>滑鼠按住或單指滑動可<strong>左右平移</strong>查看歷史 K 線與指針即時價</span>
+        </div>
+
+        <div style="position:relative; width:100%; height:260px; background:var(--bg-canvas); border-radius:12px; border:1px solid var(--border-color); overflow:hidden;">
+          <canvas id="drawerKlineCanvas" style="width:100%; height:100%; display:block; cursor:crosshair;"></canvas>
+        </div>
+      </div>
+
+      <!-- Drawer Tab 2: AI 決策與型態 -->
+      <div id="drawerTabAi" style="display:none;">
+        <div id="drawerAiPatternsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <!-- Drawer Tab 3: 停損停利階梯與試算 -->
+      <div id="drawerTabLadder" style="display:none;">
+        <div class="m-card-metrics num" style="margin-bottom:12px; grid-template-columns:repeat(3, 1fr);">
+          <div>
+            <div class="m-metric-lbl">建議買進區間</div>
+            <div id="drawerLadderEntry" class="m-metric-val">--</div>
+          </div>
+          <div>
+            <div class="m-metric-lbl">動態 Chandelier 停損</div>
+            <div id="drawerLadderStop" class="m-metric-val text-down">--</div>
+          </div>
+          <div>
+            <div class="m-metric-lbl">共識目標價 (TP1)</div>
+            <div id="drawerLadderTarget" class="m-metric-val text-up">--</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-subtle); border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">階梯停利風控建議</div>
+          <div id="drawerLadderSteps" style="font-size:12px; color:var(--text-secondary); line-height:1.6;"></div>
+        </div>
+      </div>
+
+      <!-- Drawer Tab 4: 財務與籌碼同業比價 -->
+      <div id="drawerTabFund" style="display:none;">
+        <div class="m-card-metrics num" style="grid-template-columns:repeat(4, 1fr); margin-bottom:12px;">
+          <div>
+            <div class="m-metric-lbl">F-Score 評分</div>
+            <div id="drawerFundFScore" class="m-metric-val">--/9</div>
+          </div>
+          <div>
+            <div class="m-metric-lbl">ROE 股東權益</div>
+            <div id="drawerFundRoe" class="m-metric-val text-up">--%</div>
+          </div>
+          <div>
+            <div class="m-metric-lbl">本益比 PE</div>
+            <div id="drawerFundPe" class="m-metric-val">--x</div>
+          </div>
+          <div>
+            <div class="m-metric-lbl">現金殖利率</div>
+            <div id="drawerFundYield" class="m-metric-val">--%</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-subtle); border-radius:12px; padding:12px; font-size:12px; color:var(--text-secondary);">
+          <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px;">5 日三大法人籌碼動向</div>
+          <div id="drawerFundFlow">外資與投信近期偏多布局</div>
+          <div style="margin-top:8px; font-weight:700; color:var(--text-primary);">概念題材標籤</div>
+          <div id="drawerFundThemes" style="margin-top:2px; color:var(--text-muted);">--</div>
+        </div>
+      </div>
+
+      <!-- Drawer Footer Actions -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+        <button id="drawerWatchlistBtn" type="button" class="btn btn-ghost" onclick="toggleWatchlistFromDrawer()">+ 自選股</button>
+        <button type="button" class="btn btn-ghost" onclick="openPositionSheetFromDrawer()">+ 持倉試算</button>
+        <button type="button" class="btn" onclick="jumpToFullDiagnosisFromDrawer()">完整診斷頁 ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Fixed 5-Tab Bottom Navigation (FinanceLife Style) -->
   <nav class="mobile-bottom-nav">
     <button class="mob-tab active" data-tab="screener" onclick="switchTab('screener')">
-      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
-      <span>選股族群</span>
+      <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      <span>選股</span>
     </button>
     <button class="mob-tab" data-tab="diagnosis" onclick="switchTab('diagnosis')">
-      <svg viewBox="0 0 24 24"><path d="M9 3v18"/><path d="M6 7h6v8H6z"/><path d="M17 5v14"/><path d="M14 9h6v6h-6z"/></svg>
-      <span>個股型態</span>
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>型態</span>
     </button>
     <button class="mob-tab" data-tab="etf" onclick="switchTab('etf')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg>
-      <span>ETF專區</span>
+      <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      <span>ETF</span>
     </button>
     <button class="mob-tab" data-tab="portfolio" onclick="switchTab('portfolio')">
       <span id="mobAlertDot" class="mob-badge-dot num">0</span>
-      <svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5z"/><path d="M16 12h5"/></svg>
-      <span>資產持倉</span>
+      <svg viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+      <span>資產</span>
     </button>
     <button class="mob-tab" data-tab="settings" onclick="switchTab('settings')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0-4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      <span>總經設定</span>
+      <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      <span>設定</span>
     </button>
   </nav>
 
@@ -1651,6 +1900,23 @@
     // =========================================================================
     const STORAGE_TOKEN_KEY = 'alphamind_auth_token_v1';
     const STORAGE_CRED_KEY = 'alphamind_saved_credentials_v1';
+    const STORAGE_API_BASE_KEY = 'alphamind_api_base_url_v1';
+
+    // 自動偵測或讀取自訂後端 API 網址：
+    // - 本機與區網直連 server.py 時為空字串 '' (同源自動連線)
+    // - 若前端部署於 Vercel，可由網址參數 ?api=https://xxx.onrender.com 或 localStorage 自動指向雲端 Python 後端
+    const _urlParams = new URLSearchParams(window.location.search);
+    if (_urlParams.get('api')) {
+      localStorage.setItem(STORAGE_API_BASE_KEY, _urlParams.get('api').replace(/\/+$/, ''));
+    }
+    const API_BASE_URL = (window.ALPHAMIND_API_BASE || localStorage.getItem(STORAGE_API_BASE_KEY) || '').replace(/\/+$/, '');
+
+    function resolveApiUrl(input) {
+      if (typeof input === 'string' && input.startsWith('/api/')) {
+        return `${API_BASE_URL}${input}`;
+      }
+      return input;
+    }
 
     const state = {
       authMode: 'login',
@@ -1679,16 +1945,17 @@
       observer: null,
     };
 
-    // Intercept all /api/* requests to attach User Session Token & enforce Mandatory Login Gate
+    // Intercept all /api/* requests to attach User Session Token, resolve API_BASE_URL & enforce Mandatory Login Gate
     const _rawFetch = window.fetch.bind(window);
     window.fetch = async function(input, init = {}) {
-      const urlStr = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+      const resolvedInput = resolveApiUrl(input);
+      const urlStr = typeof resolvedInput === 'string' ? resolvedInput : (resolvedInput && resolvedInput.url ? resolvedInput.url : '');
       const headers = new Headers(init.headers || {});
       if (state.authToken && urlStr.includes('/api/')) {
         headers.set('Authorization', `Bearer ${state.authToken}`);
         headers.set('X-AlphaMind-Token', state.authToken);
       }
-      const res = await _rawFetch(input, { ...init, headers });
+      const res = await _rawFetch(resolvedInput, { ...init, headers });
       if (res.status === 401 && !urlStr.includes('/api/auth/login') && !urlStr.includes('/api/auth/register')) {
         showMandatoryLoginGate();
       }
@@ -1796,7 +2063,7 @@
 
     async function performLoginRequest(username, password) {
       try {
-        const res = await _rawFetch('/api/auth/login', {
+        const res = await _rawFetch(resolveApiUrl('/api/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
@@ -1817,7 +2084,7 @@
 
     async function performRegisterRequest(username, password, displayName, initialCashTwd) {
       try {
-        const res = await _rawFetch('/api/auth/register', {
+        const res = await _rawFetch(resolveApiUrl('/api/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1901,7 +2168,7 @@
       // 1. 優先以已儲存的 Session Token 驗證
       if (state.authToken) {
         try {
-          const res = await _rawFetch(`/api/auth/session?token=${encodeURIComponent(state.authToken)}`);
+          const res = await _rawFetch(resolveApiUrl(`/api/auth/session?token=${encodeURIComponent(state.authToken)}`));
           const data = await res.json();
           if (data && data.authenticated && data.user) {
             await onAuthSuccess(data);
@@ -1967,7 +2234,7 @@
         state.selectedEtfSymbol = symbol;
         switchTab('etf');
       } else {
-        jumpToDiagnosis(symbol);
+        openStockDrawer(symbol);
       }
     }
 
@@ -2223,7 +2490,7 @@
           const kBadgeClass = item.kline_bias === 'BULLISH' ? 'badge-up' : (item.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
           const actBadgeClass = item.gate_action === 'STRONG_BUY' ? 'badge-up' : (item.gate_action === 'ACCUMULATE' ? 'badge-blue' : 'badge-neutral');
           return `
-            <tr class="clickable-row" data-quote-symbol="${item.symbol}" onclick="jumpToDiagnosis('${item.symbol}')">
+            <tr class="clickable-row" data-quote-symbol="${item.symbol}" onclick="openStockDrawer('${item.symbol}')">
               <td>
                 <div style="font-weight:700;" class="num">${item.symbol} ${item.name}</div>
                 <div style="font-size:11px; color:var(--text-muted);">${item.market}</div>
@@ -2261,7 +2528,7 @@
           const actBadgeClass = item.gate_action === 'STRONG_BUY' ? 'badge-up' : (item.gate_action === 'ACCUMULATE' ? 'badge-blue' : 'badge-neutral');
           return `
             <div class="m-card" data-quote-symbol="${item.symbol}">
-              <div class="m-card-top" onclick="jumpToDiagnosis('${item.symbol}')">
+              <div class="m-card-top" onclick="openStockDrawer('${item.symbol}')">
                 <div>
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span class="num" style="font-size:16px; font-weight:700;">${item.symbol} ${item.name}</span>
@@ -2298,7 +2565,7 @@
               </div>
 
               <div class="m-card-actions">
-                <button class="btn btn-xs" onclick="jumpToDiagnosis('${item.symbol}')">K線與診斷</button>
+                <button class="btn btn-xs" onclick="openStockDrawer('${item.symbol}')">K線與診斷</button>
                 <button class="btn btn-ghost btn-xs" onclick="quickAddWatchlist('${item.symbol}', '${item.name}', ${item.price})">+ 自選股</button>
                 <button class="btn btn-ghost btn-xs" onclick="openPositionSheet('${item.symbol}', '${item.name}', ${item.price})">+ 持倉試算</button>
               </div>
@@ -2378,8 +2645,9 @@
           `;
         }).join('');
 
-        // Render SVG Candlestick + Chandelier Stop Chart
+        // Render Interactive Candlestick + Chandelier Stop Chart
         renderCandlestickChart(data.k_lines, pat.neckline_support);
+        setTimeout(() => { if (typeof drawKlineCanvas === 'function') drawKlineCanvas(); }, 60);
 
         // Render ETF Holders of this stock
         const holders = (data.etf_holders && data.etf_holders.holders) || [];
@@ -2437,73 +2705,545 @@
       }
     }
 
-    function renderCandlestickChart(kLines, necklinePrice) {
-      const container = document.getElementById('klineChartContainer');
-      if (!kLines || kLines.length === 0) {
-        container.innerHTML = '';
-        return;
+    // =========================================================================
+    // Interactive Canvas Candlestick Chart (Pan, Zoom, Crosshair HUD)
+    // =========================================================================
+    const klineChart = {
+      bars: [],
+      neckline: null,
+      ma5: [],
+      ma20: [],
+      visibleCount: 30,
+      panOffset: 0, // 0 = viewing latest
+      isDragging: false,
+      dragStartX: 0,
+      dragStartOffset: 0,
+      hoverIndex: -1,
+      hoverY: null,
+      hoverPrice: null,
+      minP: 0,
+      maxP: 0,
+      rangeP: 1,
+      canvas: null,
+      ctx: null,
+      inited: false,
+    };
+
+    function calculateMA(bars, period) {
+      const mas = [];
+      for (let i = 0; i < bars.length; i++) {
+        if (i < period - 1) {
+          let sum = 0;
+          for (let j = 0; j <= i; j++) sum += bars[j].close;
+          mas.push(sum / (i + 1));
+        } else {
+          let sum = 0;
+          for (let j = i - period + 1; j <= i; j++) sum += bars[j].close;
+          mas.push(sum / period);
+        }
       }
-      const w = 680;
-      const h = 220;
-      const padL = 44;
-      const padR = 14;
-      const padT = 12;
-      const padB = 22;
+      return mas;
+    }
 
-      const allPrices = [];
-      kLines.forEach((d) => {
-        allPrices.push(d.high, d.low);
-        if (d.stop > 0) allPrices.push(d.stop);
+    function initKlineCanvasEvents() {
+      const canvas = document.getElementById('klineCanvas');
+      if (!canvas || klineChart.inited) return;
+      klineChart.canvas = canvas;
+      klineChart.ctx = canvas.getContext('2d');
+      klineChart.inited = true;
+
+      const onPointerDown = (clientX, clientY) => {
+        klineChart.isDragging = true;
+        klineChart.dragStartX = clientX;
+        klineChart.dragStartOffset = klineChart.panOffset;
+        updateHoverFromCoords(clientX, clientY);
+      };
+
+      const onPointerMove = (clientX, clientY) => {
+        if (klineChart.isDragging) {
+          const rect = canvas.getBoundingClientRect();
+          const deltaX = clientX - klineChart.dragStartX;
+          const barWidth = rect.width / Math.max(1, klineChart.visibleCount);
+          // 拖曳向右 (deltaX > 0) -> 想看過去歷史 K 線 -> 增加 panOffset
+          const barShift = Math.round(deltaX / Math.max(4, barWidth));
+          const maxPan = Math.max(0, klineChart.bars.length - klineChart.visibleCount);
+          klineChart.panOffset = Math.max(0, Math.min(maxPan, klineChart.dragStartOffset + barShift));
+          drawKlineCanvas();
+        }
+        updateHoverFromCoords(clientX, clientY);
+      };
+
+      const onPointerUp = () => {
+        klineChart.isDragging = false;
+      };
+
+      // Mouse events
+      canvas.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        onPointerDown(e.clientX, e.clientY);
       });
-      if (necklinePrice > 0) allPrices.push(necklinePrice);
-
-      const minP = Math.min(...allPrices) * 0.992;
-      const maxP = Math.max(...allPrices) * 1.008;
-      const rangeP = Math.max(1, maxP - minP);
-
-      const xStep = (w - padL - padR) / kLines.length;
-      const yScale = (val) => padT + (h - padT - padB) * (1 - (val - minP) / rangeP);
-
-      let candlesSvg = '';
-      let stopPoints = [];
-
-      kLines.forEach((d, i) => {
-        const cx = padL + i * xStep + xStep / 2;
-        const isBull = d.close >= d.open;
-        const color = isBull ? '#DC2626' : '#16A34A';
-        const yHigh = yScale(d.high);
-        const yLow = yScale(d.low);
-        const yOpen = yScale(d.open);
-        const yClose = yScale(d.close);
-        const bodyTop = Math.min(yOpen, yClose);
-        const bodyH = Math.max(2.5, Math.abs(yClose - yOpen));
-        const candleW = Math.max(4, xStep * 0.58);
-
-        candlesSvg += `
-          <line x1="${cx}" y1="${yHigh}" x2="${cx}" y2="${yLow}" stroke="${color}" stroke-width="1.3" />
-          <rect x="${cx - candleW / 2}" y="${bodyTop}" width="${candleW}" height="${bodyH}" fill="${color}" rx="1" />
-        `;
-
-        if (d.stop && d.stop > 0) {
-          stopPoints.push(`${cx.toFixed(1)},${yScale(d.stop).toFixed(1)}`);
+      window.addEventListener('mousemove', (e) => {
+        if (klineChart.isDragging || klineChart.hoverIndex >= 0) {
+          onPointerMove(e.clientX, e.clientY);
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        if (klineChart.isDragging) onPointerUp();
+      });
+      canvas.addEventListener('mouseleave', () => {
+        klineChart.hoverIndex = -1;
+        klineChart.hoverY = null;
+        klineChart.hoverPrice = null;
+        if (!klineChart.isDragging) {
+          drawKlineCanvas();
+          if (klineChart.bars.length > 0) {
+            const idx = Math.max(0, klineChart.bars.length - 1 - klineChart.panOffset);
+            updateKlineHud(klineChart.bars[idx], klineChart.ma5[idx], klineChart.ma20[idx]);
+          }
         }
       });
 
-      const yNeck = necklinePrice ? yScale(necklinePrice) : null;
+      // Touch events (手機端支援滑順左右拖曳與防止頁面跳動)
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
 
-      container.innerHTML = `
-        <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:100%; overflow:visible;">
-          <line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="#EAEDF2" stroke-dasharray="3,3" />
-          <line x1="${padL}" y1="${h / 2}" x2="${w - padR}" y2="${h / 2}" stroke="#EAEDF2" stroke-dasharray="3,3" />
-          <line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#EAEDF2" />
-          <text x="2" y="${padT + 4}" font-size="10" fill="#8B95A1">${maxP.toFixed(0)}</text>
-          <text x="2" y="${h / 2 + 4}" font-size="10" fill="#8B95A1">${((maxP + minP) / 2).toFixed(0)}</text>
-          <text x="2" y="${h - padB}" font-size="10" fill="#8B95A1">${minP.toFixed(0)}</text>
-          ${yNeck ? `<line x1="${padL}" y1="${yNeck}" x2="${w - padR}" y2="${yNeck}" stroke="#D97706" stroke-width="1.2" stroke-dasharray="4,4" />` : ''}
-          ${stopPoints.length > 1 ? `<polyline fill="none" stroke="#2563EB" stroke-width="2" stroke-dasharray="5,3" points="${stopPoints.join(' ')}" />` : ''}
-          ${candlesSvg}
-        </svg>
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', () => {
+        onPointerUp();
+        if (klineChart.bars.length > 0) {
+          klineChart.hoverIndex = -1;
+          klineChart.hoverY = null;
+          klineChart.hoverPrice = null;
+          drawKlineCanvas();
+          const lastIdx = klineChart.bars.length - 1;
+          updateKlineHud(klineChart.bars[lastIdx], klineChart.ma5[lastIdx], klineChart.ma20[lastIdx]);
+        }
+      });
+
+      // Wheel Zoom (滾輪縮放視窗範圍)
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 3 : -3;
+        const newCount = Math.max(15, Math.min(klineChart.bars.length, klineChart.visibleCount + delta));
+        setKlineRange(newCount, false);
+      }, { passive: false });
+
+      window.addEventListener('resize', () => {
+        drawKlineCanvas();
+      });
+    }
+
+    function updateHoverFromCoords(clientX, clientY) {
+      if (!klineChart.canvas || klineChart.bars.length === 0) return;
+      const rect = klineChart.canvas.getBoundingClientRect();
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        return;
+      }
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const padL = 6;
+      const padR = 52;
+      const padT = 14;
+      const mainH = Math.round(rect.height * 0.70);
+      const chartW = rect.width - padL - padR;
+
+      const total = klineChart.bars.length;
+      const count = Math.min(klineChart.visibleCount, total);
+      const endIdx = total - klineChart.panOffset;
+      const startIdx = Math.max(0, endIdx - count);
+      const visibleBars = klineChart.bars.slice(startIdx, endIdx);
+
+      if (visibleBars.length === 0) return;
+      const xStep = chartW / visibleBars.length;
+      const relIdx = Math.max(0, Math.min(visibleBars.length - 1, Math.floor((x - padL) / xStep)));
+
+      // 依據游標 Y 座標反推真實對應價格 (游標點到哪，精準換算到哪)
+      const clampedY = Math.max(padT, Math.min(mainH, y));
+      let exactPrice = null;
+      if (klineChart.rangeP && klineChart.minP !== undefined) {
+        const ratio = 1 - (clampedY - padT) / Math.max(1, (mainH - padT));
+        exactPrice = klineChart.minP + ratio * klineChart.rangeP;
+      }
+
+      klineChart.hoverIndex = relIdx;
+      klineChart.hoverY = clampedY;
+      klineChart.hoverPrice = exactPrice;
+
+      const bar = visibleBars[relIdx];
+      const ma5Val = klineChart.ma5[startIdx + relIdx];
+      const ma20Val = klineChart.ma20[startIdx + relIdx];
+      updateKlineHud(bar, ma5Val, ma20Val, exactPrice);
+      drawKlineCanvas();
+    }
+
+    function updateKlineHud(bar, ma5Val, ma20Val, hoverPrice) {
+      const hud = document.getElementById('klineHudBar');
+      if (!hud || !bar) return;
+      const isUp = bar.close >= bar.open;
+      const diff = bar.close - bar.open;
+      const pct = bar.open > 0 ? ((diff / bar.open) * 100).toFixed(2) : '0.00';
+      const volLots = Math.round(bar.volume / 1000);
+      const ma5Str = ma5Val ? ` | MA5: <span style="color:#D97706; font-weight:700;">${ma5Val.toFixed(1)}</span>` : '';
+      const ma20Str = ma20Val ? ` | MA20: <span style="color:#8B5CF6; font-weight:700;">${ma20Val.toFixed(1)}</span>` : '';
+      const stopStr = bar.stop > 0 ? ` | 停損: <span style="color:#2563EB; font-weight:700;">${Number(bar.stop).toFixed(1)}</span>` : '';
+
+      let pointerStr = '';
+      if (hoverPrice !== undefined && hoverPrice !== null) {
+        const pDiff = hoverPrice - bar.close;
+        const pDiffPct = bar.close > 0 ? ((pDiff / bar.close) * 100).toFixed(2) : '0.00';
+        const pDiffColor = pDiff >= 0 ? '#F04452' : '#059669';
+        pointerStr = `<span style="background:var(--brand-blue); color:#fff; padding:2px 7px; border-radius:4px; font-weight:700; font-size:12px;">指針價: ${hoverPrice.toFixed(1)}</span> <span style="color:${pDiffColor}; font-weight:600;">(${pDiff >= 0 ? '+' : ''}${pDiff.toFixed(1)} · ${pDiff >= 0 ? '+' : ''}${pDiffPct}%)</span> | `;
+      }
+
+      hud.innerHTML = `
+        ${pointerStr}
+        <span><strong>${bar.date}</strong></span>
+        <span>開: <strong>${bar.open.toFixed(1)}</strong></span>
+        <span>高: <strong>${bar.high.toFixed(1)}</strong></span>
+        <span>低: <strong>${bar.low.toFixed(1)}</strong></span>
+        <span>收: <strong class="${isUp ? 'text-up' : 'text-down'}">${bar.close.toFixed(1)} (${isUp ? '+' : ''}${pct}%)</strong></span>
+        <span>量: <strong>${volLots.toLocaleString()} 張</strong></span>
+        ${ma5Str}
+        ${ma20Str}
+        ${stopStr}
       `;
+    }
+
+    function setKlineRange(count, updatePills = true) {
+      klineChart.visibleCount = Math.max(15, Math.min(klineChart.bars.length || 90, count));
+      const maxPan = Math.max(0, klineChart.bars.length - klineChart.visibleCount);
+      klineChart.panOffset = Math.max(0, Math.min(maxPan, klineChart.panOffset));
+
+      if (updatePills) {
+        ['btnKline30', 'btnKline60', 'btnKlineAll'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('active');
+        });
+        if (count === 30) document.getElementById('btnKline30')?.classList.add('active');
+        else if (count === 60) document.getElementById('btnKline60')?.classList.add('active');
+        else document.getElementById('btnKlineAll')?.classList.add('active');
+      }
+      drawKlineCanvas();
+    }
+
+    function resetKlinePan() {
+      klineChart.panOffset = 0;
+      klineChart.hoverIndex = -1;
+      klineChart.hoverY = null;
+      klineChart.hoverPrice = null;
+      drawKlineCanvas();
+      if (klineChart.bars.length > 0) {
+        const lastIdx = klineChart.bars.length - 1;
+        updateKlineHud(klineChart.bars[lastIdx], klineChart.ma5[lastIdx], klineChart.ma20[lastIdx]);
+      }
+    }
+
+    function renderCandlestickChart(kLines, necklinePrice) {
+      if (!kLines || kLines.length === 0) return;
+      klineChart.bars = kLines;
+      klineChart.neckline = necklinePrice || null;
+      klineChart.ma5 = calculateMA(kLines, 5);
+      klineChart.ma20 = calculateMA(kLines, 20);
+      klineChart.panOffset = 0;
+      klineChart.hoverIndex = -1;
+      klineChart.hoverY = null;
+      klineChart.hoverPrice = null;
+
+      initKlineCanvasEvents();
+      setKlineRange(klineChart.visibleCount || 30);
+      const lastIdx = kLines.length - 1;
+      updateKlineHud(kLines[lastIdx], klineChart.ma5[lastIdx], klineChart.ma20[lastIdx]);
+    }
+
+    function drawKlineCanvas() {
+      const canvas = document.getElementById('klineCanvas');
+      if (!canvas || !klineChart.bars || klineChart.bars.length === 0) return;
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      const w = rect.width;
+      const h = rect.height;
+      if (w <= 0 || h <= 0) return;
+
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      // Slicing visible bars
+      const total = klineChart.bars.length;
+      const count = Math.min(klineChart.visibleCount, total);
+      const maxPan = Math.max(0, total - count);
+      klineChart.panOffset = Math.max(0, Math.min(maxPan, klineChart.panOffset));
+
+      const endIdx = total - klineChart.panOffset;
+      const startIdx = Math.max(0, endIdx - count);
+      const visibleBars = klineChart.bars.slice(startIdx, endIdx);
+      const visibleMa5 = klineChart.ma5.slice(startIdx, endIdx);
+      const visibleMa20 = klineChart.ma20.slice(startIdx, endIdx);
+
+      if (visibleBars.length === 0) return;
+
+      const padL = 6;
+      const padR = 52;
+      const padT = 14;
+      const padB = 20;
+      const mainH = Math.round(h * 0.70);
+      const volT = mainH + 10;
+      const volH = h - volT - padB;
+      const chartW = w - padL - padR;
+
+      // Clear Canvas
+      ctx.clearRect(0, 0, w, h);
+
+      // Find price min/max
+      let minP = Infinity;
+      let maxP = -Infinity;
+      visibleBars.forEach((b) => {
+        minP = Math.min(minP, b.low);
+        maxP = Math.max(maxP, b.high);
+        if (b.stop > 0) minP = Math.min(minP, b.stop);
+      });
+      if (klineChart.neckline > 0) {
+        minP = Math.min(minP, klineChart.neckline);
+        maxP = Math.max(maxP, klineChart.neckline);
+      }
+      visibleMa5.forEach((v) => { if (v) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
+      visibleMa20.forEach((v) => { if (v) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
+
+      const pBuf = Math.max(1, (maxP - minP) * 0.05);
+      minP = Math.max(0.1, minP - pBuf);
+      maxP = maxP + pBuf;
+      const rangeP = Math.max(1, maxP - minP);
+
+      // 儲存至全域便於指針精準換算
+      klineChart.minP = minP;
+      klineChart.maxP = maxP;
+      klineChart.rangeP = rangeP;
+
+      const yPrice = (val) => padT + (mainH - padT) * (1 - (val - minP) / rangeP);
+
+      // Find volume max
+      let maxV = 1;
+      visibleBars.forEach((b) => {
+        maxV = Math.max(maxV, b.volume || 1);
+      });
+      const yVol = (val) => (volT + volH) - (val / maxV) * volH;
+
+      // 1. Draw Grid Lines & Price Labels
+      const gridCount = 4;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#EAEDF2';
+      ctx.fillStyle = '#8B95A1';
+      ctx.font = '10px tabular-nums, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= gridCount; i++) {
+        const pVal = minP + (rangeP / gridCount) * i;
+        const yPos = yPrice(pVal);
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(padL, yPos);
+        ctx.lineTo(w - padR, yPos);
+        ctx.stroke();
+        ctx.fillText(pVal.toFixed(1), w - padR + 6, yPos);
+      }
+
+      // 2. Draw Volume Separation Line
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.beginPath();
+      ctx.moveTo(padL, volT - 4);
+      ctx.lineTo(w - padR, volT - 4);
+      ctx.stroke();
+
+      // Volume Max Label
+      const maxLots = Math.round(maxV / 1000);
+      ctx.fillText(`${maxLots}張`, w - padR + 6, volT + 6);
+
+      // 3. Draw Neckline (if present)
+      if (klineChart.neckline > 0 && klineChart.neckline >= minP && klineChart.neckline <= maxP) {
+        const yNeck = yPrice(klineChart.neckline);
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(padL, yNeck);
+        ctx.lineTo(w - padR, yNeck);
+        ctx.stroke();
+      }
+
+      // 4. Draw Candlesticks & Volume Bars
+      const nBars = visibleBars.length;
+      const xStep = chartW / nBars;
+      const candleW = Math.max(3, xStep * 0.65);
+
+      const stopPoints = [];
+      const ma5Points = [];
+      const ma20Points = [];
+
+      visibleBars.forEach((b, i) => {
+        const cx = padL + i * xStep + xStep / 2;
+        const isUp = b.close >= b.open;
+        const color = isUp ? '#F04452' : '#059669';
+
+        // Draw Volume Bar
+        const volTop = yVol(b.volume);
+        const volBot = volT + volH;
+        ctx.fillStyle = isUp ? 'rgba(240, 68, 82, 0.60)' : 'rgba(5, 150, 105, 0.60)';
+        ctx.fillRect(cx - candleW / 2, volTop, candleW, Math.max(1, volBot - volTop));
+
+        // Draw Candle Wick
+        const yH = yPrice(b.high);
+        const yL = yPrice(b.low);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(cx, yH);
+        ctx.lineTo(cx, yL);
+        ctx.stroke();
+
+        // Draw Candle Body
+        const yO = yPrice(b.open);
+        const yC = yPrice(b.close);
+        const top = Math.min(yO, yC);
+        const bHeight = Math.max(2, Math.abs(yC - yO));
+        ctx.fillStyle = color;
+        ctx.fillRect(cx - candleW / 2, top, candleW, bHeight);
+
+        // Collect Stop Loss points
+        if (b.stop && b.stop > 0) {
+          stopPoints.push({ x: cx, y: yPrice(b.stop) });
+        }
+        // Collect MA points
+        if (visibleMa5[i]) ma5Points.push({ x: cx, y: yPrice(visibleMa5[i]) });
+        if (visibleMa20[i]) ma20Points.push({ x: cx, y: yPrice(visibleMa20[i]) });
+
+        // Date labels (every ~6-8 bars)
+        const dateInterval = Math.max(4, Math.floor(nBars / 5));
+        if (i % dateInterval === 0 || i === nBars - 1) {
+          ctx.fillStyle = '#8B95A1';
+          ctx.textAlign = 'center';
+          const parts = b.date.split('-');
+          const dtText = parts.length >= 3 ? `${parts[1]}/${parts[2]}` : b.date;
+          ctx.fillText(dtText, cx, h - 4);
+        }
+      });
+
+      // 5. Draw MA5 Polyline (Gold)
+      if (ma5Points.length > 1) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#D97706';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(ma5Points[0].x, ma5Points[0].y);
+        for (let i = 1; i < ma5Points.length; i++) ctx.lineTo(ma5Points[i].x, ma5Points[i].y);
+        ctx.stroke();
+      }
+
+      // 6. Draw MA20 Polyline (Purple)
+      if (ma20Points.length > 1) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#8B5CF6';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(ma20Points[0].x, ma20Points[0].y);
+        for (let i = 1; i < ma20Points.length; i++) ctx.lineTo(ma20Points[i].x, ma20Points[i].y);
+        ctx.stroke();
+      }
+
+      // 7. Draw Chandelier Stop Loss Line (Blue Dashed)
+      if (stopPoints.length > 1) {
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = '#2563EB';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(stopPoints[0].x, stopPoints[0].y);
+        for (let i = 1; i < stopPoints.length; i++) ctx.lineTo(stopPoints[i].x, stopPoints[i].y);
+        ctx.stroke();
+      }
+
+      // 8. 繪製十字游標線與隨動即時指針價格 (指針移動到多少，精確顯示多少)
+      if (klineChart.hoverIndex >= 0 && klineChart.hoverIndex < visibleBars.length) {
+        const hIdx = klineChart.hoverIndex;
+        const hBar = visibleBars[hIdx];
+        const hx = padL + hIdx * xStep + xStep / 2;
+        // hy: 游標手指指針實際 Y 座標（若未給定則預設收盤價）
+        const hy = klineChart.hoverY !== null && klineChart.hoverY !== undefined ? klineChart.hoverY : yPrice(hBar.close);
+        const displayP = klineChart.hoverPrice !== null && klineChart.hoverPrice !== undefined ? klineChart.hoverPrice : hBar.close;
+
+        // 垂直虛線貫穿主圖與副圖
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = '#4B5563';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(hx, padT);
+        ctx.lineTo(hx, volT + volH);
+        ctx.stroke();
+
+        // 水平虛線在手指/滑鼠所指的實際高度
+        ctx.beginPath();
+        ctx.moveTo(padL, hy);
+        ctx.lineTo(w - padR, hy);
+        ctx.stroke();
+
+        // 十字交會點發光圓點
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#2563EB';
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // K 棒收盤價實體參考點 (若與指針不同高度，標註當根實體價位)
+        const closeY = yPrice(hBar.close);
+        if (Math.abs(hy - closeY) > 5) {
+          ctx.beginPath();
+          ctx.arc(hx, closeY, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = hBar.close >= hBar.open ? '#F04452' : '#059669';
+          ctx.fill();
+        }
+
+        // 右側 Y 軸高對比指針價格徽章（深藍底白字，清晰凸顯指針精確價）
+        ctx.fillStyle = '#1D4ED8';
+        const badgeH = 18;
+        const badgeW = padR - 3;
+        ctx.beginPath();
+        ctx.roundRect(w - padR + 2, hy - badgeH / 2, badgeW, badgeH, 4);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 10px tabular-nums, -apple-system, sans-serif';
+        ctx.fillText(displayP.toFixed(1), w - padR + 5, hy);
+
+        // 底部 X 軸日期標籤徽章
+        ctx.fillStyle = '#1E293B';
+        const dtStr = hBar.date.length > 5 ? hBar.date.slice(5) : hBar.date;
+        const dtW = 42;
+        ctx.beginPath();
+        ctx.roundRect(hx - dtW / 2, volT + volH + 2, dtW, 14, 3);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.font = '9px tabular-nums, sans-serif';
+        ctx.fillText(dtStr, hx, volT + volH + 11);
+      }
     }
 
     async function recalcDualStops() {
@@ -2706,7 +3446,7 @@
               </td>
               <td class="num">${c.shares_held_lots > 0 ? c.shares_held_lots.toLocaleString() + ' 張' : '--'}</td>
               <td>
-                ${/^\d{4}$/.test(c.stock_symbol) ? `<button class="btn btn-ghost btn-xs" onclick="jumpToDiagnosis('${c.stock_symbol}')">診斷</button>` : '--'}
+                ${/^\d{4}$/.test(c.stock_symbol) ? `<button class="btn btn-ghost btn-xs" onclick="openStockDrawer('${c.stock_symbol}')">診斷</button>` : '--'}
               </td>
             </tr>
           `).join('');
@@ -2817,7 +3557,7 @@
         return `
           <tr data-quote-symbol="${p.symbol}">
             <td>
-              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="jumpToDiagnosis('${p.symbol}')">${p.symbol} ${p.name}</div>
+              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="openStockDrawer('${p.symbol}')">${p.symbol} ${p.name}</div>
               <div style="font-size:11px; color:var(--text-muted);">${p.sector}</div>
             </td>
             <td class="num">${p.shares.toLocaleString()} 股</td>
@@ -2853,7 +3593,7 @@
         const kCls = p.kline_bias === 'BULLISH' ? 'badge-up' : (p.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
         return `
           <div class="m-card" data-quote-symbol="${p.symbol}">
-            <div class="m-card-top" onclick="jumpToDiagnosis('${p.symbol}')">
+            <div class="m-card-top" onclick="openStockDrawer('${p.symbol}')">
               <div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="num" style="font-size:16px; font-weight:700;">${p.symbol} ${p.name}</span>
@@ -2887,7 +3627,7 @@
             </div>
 
             <div class="m-card-actions">
-              <button class="btn btn-xs" onclick="jumpToDiagnosis('${p.symbol}')">K線診斷</button>
+              <button class="btn btn-xs" onclick="openStockDrawer('${p.symbol}')">K線診斷</button>
               <button class="btn btn-ghost btn-xs" onclick="openPositionSheet('${p.symbol}', '${p.name}', ${p.avg_cost_price}, ${p.shares}, ${p.effective_target_price}, ${p.effective_stop_price})">調整價位</button>
               <button class="btn btn-ghost btn-xs" onclick="removePosition('${p.symbol}')">移除部位</button>
             </div>
@@ -2903,7 +3643,7 @@
         return `
           <tr data-quote-symbol="${w.symbol}">
             <td>
-              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="jumpToDiagnosis('${w.symbol}')">${w.symbol} ${w.name}</div>
+              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="openStockDrawer('${w.symbol}')">${w.symbol} ${w.name}</div>
             </td>
             <td><span class="badge badge-neutral">${w.sector}</span></td>
             <td class="num" style="font-weight:700;" data-quote-price="${w.symbol}">${w.price}</td>
@@ -2930,7 +3670,7 @@
         const kCls = w.kline_bias === 'BULLISH' ? 'badge-up' : (w.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
         return `
           <div class="m-card" data-quote-symbol="${w.symbol}">
-            <div class="m-card-top" onclick="jumpToDiagnosis('${w.symbol}')">
+            <div class="m-card-top" onclick="openStockDrawer('${w.symbol}')">
               <div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="num" style="font-size:16px; font-weight:700;">${w.symbol} ${w.name}</span>
@@ -3086,6 +3826,602 @@
 
     function quickAddPositionFromDiag() {
       openPositionSheet(state.currentDiagSymbol, state.currentDiagName, state.currentDiagPrice);
+    }
+
+    // =========================================================================
+    // Stock Detail Bottom Sheet Drawer (FinanceLife Multi-Tab Drawer)
+    // =========================================================================
+    const drawerState = {
+      symbol: '2330',
+      name: '台積電',
+      price: 1050,
+      activeTab: 'kline',
+      rawData: null,
+    };
+
+    const drawerKlineChart = {
+      bars: [],
+      neckline: null,
+      ma5: [],
+      ma20: [],
+      visibleCount: 30,
+      panOffset: 0,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartOffset: 0,
+      hoverIndex: -1,
+      hoverY: null,
+      hoverPrice: null,
+      minP: 0,
+      maxP: 0,
+      rangeP: 1,
+      canvas: null,
+      ctx: null,
+      inited: false,
+    };
+
+    function initDrawerKlineCanvasEvents() {
+      const canvas = document.getElementById('drawerKlineCanvas');
+      if (!canvas || drawerKlineChart.inited) return;
+      drawerKlineChart.canvas = canvas;
+      drawerKlineChart.ctx = canvas.getContext('2d');
+      drawerKlineChart.inited = true;
+
+      const onPointerDown = (clientX, clientY) => {
+        drawerKlineChart.isDragging = true;
+        drawerKlineChart.dragStartX = clientX;
+        drawerKlineChart.dragStartOffset = drawerKlineChart.panOffset;
+        updateDrawerHoverFromCoords(clientX, clientY);
+      };
+
+      const onPointerMove = (clientX, clientY) => {
+        if (drawerKlineChart.isDragging) {
+          const rect = canvas.getBoundingClientRect();
+          const deltaX = clientX - drawerKlineChart.dragStartX;
+          const barWidth = rect.width / Math.max(1, drawerKlineChart.visibleCount);
+          const barShift = Math.round(deltaX / Math.max(4, barWidth));
+          const maxPan = Math.max(0, drawerKlineChart.bars.length - drawerKlineChart.visibleCount);
+          drawerKlineChart.panOffset = Math.max(0, Math.min(maxPan, drawerKlineChart.dragStartOffset + barShift));
+          drawDrawerKlineCanvas();
+        }
+        updateDrawerHoverFromCoords(clientX, clientY);
+      };
+
+      const onPointerUp = () => {
+        drawerKlineChart.isDragging = false;
+      };
+
+      canvas.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        onPointerDown(e.clientX, e.clientY);
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (drawerKlineChart.isDragging || drawerKlineChart.hoverIndex >= 0) {
+          const rect = canvas.getBoundingClientRect();
+          if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+            if (!drawerKlineChart.isDragging && drawerKlineChart.hoverIndex >= 0) {
+              drawerKlineChart.hoverIndex = -1;
+              drawerKlineChart.hoverY = null;
+              drawerKlineChart.hoverPrice = null;
+              drawDrawerKlineCanvas();
+            }
+          } else {
+            onPointerMove(e.clientX, e.clientY);
+          }
+        }
+      });
+      window.addEventListener('mouseup', onPointerUp);
+
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', () => {
+        onPointerUp();
+        if (drawerKlineChart.bars.length > 0) {
+          drawerKlineChart.hoverIndex = -1;
+          drawerKlineChart.hoverY = null;
+          drawerKlineChart.hoverPrice = null;
+          drawDrawerKlineCanvas();
+          const lastIdx = drawerKlineChart.bars.length - 1;
+          updateDrawerKlineHud(drawerKlineChart.bars[lastIdx], drawerKlineChart.ma5[lastIdx], drawerKlineChart.ma20[lastIdx]);
+        }
+      });
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 3 : -3;
+        const newCount = Math.max(15, Math.min(drawerKlineChart.bars.length, drawerKlineChart.visibleCount + delta));
+        setDrawerKlineRange(newCount, false);
+      }, { passive: false });
+    }
+
+    function updateDrawerHoverFromCoords(clientX, clientY) {
+      if (!drawerKlineChart.canvas || drawerKlineChart.bars.length === 0) return;
+      const rect = drawerKlineChart.canvas.getBoundingClientRect();
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const padL = 6;
+      const padR = 48;
+      const padT = 12;
+      const mainH = Math.round(rect.height * 0.70);
+      const chartW = rect.width - padL - padR;
+
+      const total = drawerKlineChart.bars.length;
+      const count = Math.min(drawerKlineChart.visibleCount, total);
+      const endIdx = total - drawerKlineChart.panOffset;
+      const startIdx = Math.max(0, endIdx - count);
+      const visibleBars = drawerKlineChart.bars.slice(startIdx, endIdx);
+      if (visibleBars.length === 0) return;
+
+      const xStep = chartW / visibleBars.length;
+      const relIdx = Math.max(0, Math.min(visibleBars.length - 1, Math.floor((x - padL) / xStep)));
+      const clampedY = Math.max(padT, Math.min(mainH, y));
+      let exactPrice = null;
+      if (drawerKlineChart.rangeP && drawerKlineChart.minP !== undefined) {
+        const ratio = 1 - (clampedY - padT) / Math.max(1, (mainH - padT));
+        exactPrice = drawerKlineChart.minP + ratio * drawerKlineChart.rangeP;
+      }
+
+      drawerKlineChart.hoverIndex = relIdx;
+      drawerKlineChart.hoverY = clampedY;
+      drawerKlineChart.hoverPrice = exactPrice;
+
+      const bar = visibleBars[relIdx];
+      const ma5Val = drawerKlineChart.ma5[startIdx + relIdx];
+      const ma20Val = drawerKlineChart.ma20[startIdx + relIdx];
+      updateDrawerKlineHud(bar, ma5Val, ma20Val, exactPrice);
+      drawDrawerKlineCanvas();
+    }
+
+    function updateDrawerKlineHud(bar, ma5Val, ma20Val, hoverPrice) {
+      const hud = document.getElementById('drawerKlineHudBar');
+      if (!hud || !bar) return;
+      const isUp = bar.close >= bar.open;
+      const diff = bar.close - bar.open;
+      const pct = bar.open > 0 ? ((diff / bar.open) * 100).toFixed(2) : '0.00';
+      const volLots = Math.round((bar.volume || 0) / 1000);
+      const ma5Str = ma5Val ? ` | MA5: <span style="color:#D97706; font-weight:700;">${ma5Val.toFixed(1)}</span>` : '';
+      const ma20Str = ma20Val ? ` | MA20: <span style="color:#8B5CF6; font-weight:700;">${ma20Val.toFixed(1)}</span>` : '';
+
+      let pointerStr = '';
+      if (hoverPrice !== undefined && hoverPrice !== null) {
+        const pDiff = hoverPrice - bar.close;
+        const pDiffColor = pDiff >= 0 ? '#F04452' : '#059669';
+        pointerStr = `<span style="background:var(--brand-blue); color:#fff; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">指針: ${hoverPrice.toFixed(1)}</span> <span style="color:${pDiffColor}; font-weight:600;">(${pDiff >= 0 ? '+' : ''}${pDiff.toFixed(1)})</span> | `;
+      }
+
+      hud.innerHTML = `
+        ${pointerStr}
+        <span><strong>${bar.date}</strong></span>
+        <span>開: <strong>${bar.open.toFixed(1)}</strong></span>
+        <span>收: <strong class="${isUp ? 'text-up' : 'text-down'}">${bar.close.toFixed(1)} (${isUp ? '+' : ''}${pct}%)</strong></span>
+        <span>量: <strong>${volLots.toLocaleString()} 張</strong></span>
+        ${ma5Str}
+        ${ma20Str}
+      `;
+    }
+
+    function setDrawerKlineRange(count, updatePills = true) {
+      drawerKlineChart.visibleCount = Math.max(15, Math.min(drawerKlineChart.bars.length || 90, count));
+      const maxPan = Math.max(0, drawerKlineChart.bars.length - drawerKlineChart.visibleCount);
+      drawerKlineChart.panOffset = Math.max(0, Math.min(maxPan, drawerKlineChart.panOffset));
+
+      if (updatePills) {
+        ['btnDrawerK30', 'btnDrawerK60', 'btnDrawerKAll'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('active');
+        });
+        if (count === 30) document.getElementById('btnDrawerK30')?.classList.add('active');
+        else if (count === 60) document.getElementById('btnDrawerK60')?.classList.add('active');
+        else document.getElementById('btnDrawerKAll')?.classList.add('active');
+      }
+      drawDrawerKlineCanvas();
+    }
+
+    function resetDrawerKlinePan() {
+      drawerKlineChart.panOffset = 0;
+      drawerKlineChart.hoverIndex = -1;
+      drawerKlineChart.hoverY = null;
+      drawerKlineChart.hoverPrice = null;
+      drawDrawerKlineCanvas();
+      if (drawerKlineChart.bars.length > 0) {
+        const lastIdx = drawerKlineChart.bars.length - 1;
+        updateDrawerKlineHud(drawerKlineChart.bars[lastIdx], drawerKlineChart.ma5[lastIdx], drawerKlineChart.ma20[lastIdx]);
+      }
+    }
+
+    function renderDrawerCandlestickChart(kLines, necklinePrice) {
+      if (!kLines || kLines.length === 0) return;
+      drawerKlineChart.bars = kLines;
+      drawerKlineChart.neckline = necklinePrice || null;
+      drawerKlineChart.ma5 = calculateMA(kLines, 5);
+      drawerKlineChart.ma20 = calculateMA(kLines, 20);
+      drawerKlineChart.panOffset = 0;
+      drawerKlineChart.hoverIndex = -1;
+      drawerKlineChart.hoverY = null;
+      drawerKlineChart.hoverPrice = null;
+
+      initDrawerKlineCanvasEvents();
+      setDrawerKlineRange(drawerKlineChart.visibleCount || 30);
+      const lastIdx = kLines.length - 1;
+      updateDrawerKlineHud(kLines[lastIdx], drawerKlineChart.ma5[lastIdx], drawerKlineChart.ma20[lastIdx]);
+    }
+
+    function drawDrawerKlineCanvas() {
+      const canvas = document.getElementById('drawerKlineCanvas');
+      if (!canvas || !drawerKlineChart.bars || drawerKlineChart.bars.length === 0) return;
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = rect.width;
+      const h = rect.height;
+      if (w <= 0 || h <= 0) return;
+
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      const total = drawerKlineChart.bars.length;
+      const count = Math.min(drawerKlineChart.visibleCount, total);
+      const maxPan = Math.max(0, total - count);
+      drawerKlineChart.panOffset = Math.max(0, Math.min(maxPan, drawerKlineChart.panOffset));
+
+      const endIdx = total - drawerKlineChart.panOffset;
+      const startIdx = Math.max(0, endIdx - count);
+      const visibleBars = drawerKlineChart.bars.slice(startIdx, endIdx);
+      const visibleMa5 = drawerKlineChart.ma5.slice(startIdx, endIdx);
+      const visibleMa20 = drawerKlineChart.ma20.slice(startIdx, endIdx);
+      if (visibleBars.length === 0) return;
+
+      const padL = 6;
+      const padR = 48;
+      const padT = 12;
+      const padB = 18;
+      const mainH = Math.round(h * 0.70);
+      const volT = mainH + 8;
+      const volH = h - volT - padB;
+      const chartW = w - padL - padR;
+
+      ctx.clearRect(0, 0, w, h);
+
+      let minP = Infinity;
+      let maxP = -Infinity;
+      visibleBars.forEach((b) => {
+        minP = Math.min(minP, b.low);
+        maxP = Math.max(maxP, b.high);
+        if (b.stop > 0) minP = Math.min(minP, b.stop);
+      });
+      if (drawerKlineChart.neckline > 0) {
+        minP = Math.min(minP, drawerKlineChart.neckline);
+        maxP = Math.max(maxP, drawerKlineChart.neckline);
+      }
+      visibleMa5.forEach((v) => { if (v) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
+      visibleMa20.forEach((v) => { if (v) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
+
+      const pBuf = Math.max(1, (maxP - minP) * 0.05);
+      minP = Math.max(0.1, minP - pBuf);
+      maxP = maxP + pBuf;
+      const rangeP = Math.max(1, maxP - minP);
+
+      drawerKlineChart.minP = minP;
+      drawerKlineChart.maxP = maxP;
+      drawerKlineChart.rangeP = rangeP;
+
+      const yPrice = (val) => padT + (mainH - padT) * (1 - (val - minP) / rangeP);
+
+      let maxV = 1;
+      visibleBars.forEach((b) => { maxV = Math.max(maxV, b.volume || 1); });
+      const yVol = (val) => (volT + volH) - (val / maxV) * volH;
+
+      // 1. Grid
+      const gridCount = 4;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#EAEDF2';
+      ctx.fillStyle = '#8B95A1';
+      ctx.font = '10px tabular-nums, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= gridCount; i++) {
+        const pVal = minP + (rangeP / gridCount) * i;
+        const yPos = yPrice(pVal);
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(padL, yPos);
+        ctx.lineTo(w - padR, yPos);
+        ctx.stroke();
+        ctx.fillText(pVal.toFixed(1), w - padR + 5, yPos);
+      }
+
+      // 2. Candlesticks
+      const nBars = visibleBars.length;
+      const xStep = chartW / nBars;
+      const candleW = Math.max(3, xStep * 0.65);
+      const stopPoints = [];
+      const ma5Points = [];
+      const ma20Points = [];
+
+      visibleBars.forEach((b, i) => {
+        const cx = padL + i * xStep + xStep / 2;
+        const isUp = b.close >= b.open;
+        const color = isUp ? '#F04452' : '#059669';
+
+        // Volume Bar
+        const volTop = yVol(b.volume);
+        const volBot = volT + volH;
+        ctx.fillStyle = isUp ? 'rgba(240, 68, 82, 0.60)' : 'rgba(5, 150, 105, 0.60)';
+        ctx.fillRect(cx - candleW / 2, volTop, candleW, Math.max(1, volBot - volTop));
+
+        // Candle Wick
+        const yH = yPrice(b.high);
+        const yL = yPrice(b.low);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(cx, yH);
+        ctx.lineTo(cx, yL);
+        ctx.stroke();
+
+        // Candle Body
+        const yO = yPrice(b.open);
+        const yC = yPrice(b.close);
+        const top = Math.min(yO, yC);
+        const bHeight = Math.max(2, Math.abs(yC - yO));
+        ctx.fillStyle = color;
+        ctx.fillRect(cx - candleW / 2, top, candleW, bHeight);
+
+        if (b.stop && b.stop > 0) stopPoints.push({ x: cx, y: yPrice(b.stop) });
+        if (visibleMa5[i]) ma5Points.push({ x: cx, y: yPrice(visibleMa5[i]) });
+        if (visibleMa20[i]) ma20Points.push({ x: cx, y: yPrice(visibleMa20[i]) });
+
+        const dateInterval = Math.max(4, Math.floor(nBars / 4));
+        if (i % dateInterval === 0 || i === nBars - 1) {
+          ctx.fillStyle = '#8B95A1';
+          ctx.textAlign = 'center';
+          const parts = b.date.split('-');
+          const dtText = parts.length >= 3 ? `${parts[1]}/${parts[2]}` : b.date;
+          ctx.fillText(dtText, cx, h - 3);
+        }
+      });
+
+      // MA Lines
+      if (ma5Points.length > 1) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#D97706';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(ma5Points[0].x, ma5Points[0].y);
+        for (let i = 1; i < ma5Points.length; i++) ctx.lineTo(ma5Points[i].x, ma5Points[i].y);
+        ctx.stroke();
+      }
+      if (ma20Points.length > 1) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#8B5CF6';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(ma20Points[0].x, ma20Points[0].y);
+        for (let i = 1; i < ma20Points.length; i++) ctx.lineTo(ma20Points[i].x, ma20Points[i].y);
+        ctx.stroke();
+      }
+      if (stopPoints.length > 1) {
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = '#2563EB';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(stopPoints[0].x, stopPoints[0].y);
+        for (let i = 1; i < stopPoints.length; i++) ctx.lineTo(stopPoints[i].x, stopPoints[i].y);
+        ctx.stroke();
+      }
+
+      // Crosshairs & Pointer HUD
+      if (drawerKlineChart.hoverIndex >= 0 && drawerKlineChart.hoverIndex < visibleBars.length) {
+        const hIdx = drawerKlineChart.hoverIndex;
+        const hBar = visibleBars[hIdx];
+        const hx = padL + hIdx * xStep + xStep / 2;
+        const hy = drawerKlineChart.hoverY !== null && drawerKlineChart.hoverY !== undefined ? drawerKlineChart.hoverY : yPrice(hBar.close);
+
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = '#4B5563';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(hx, padT);
+        ctx.lineTo(hx, volT + volH);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(padL, hy);
+        ctx.lineTo(w - padR, hy);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#2563EB';
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#1D4ED8';
+        const badgeH = 17;
+        const badgeW = padR - 3;
+        ctx.beginPath();
+        ctx.roundRect(w - padR + 2, hy - badgeH / 2, badgeW, badgeH, 4);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 10px tabular-nums, sans-serif';
+        const pStr = (drawerKlineChart.hoverPrice || hBar.close).toFixed(1);
+        ctx.fillText(pStr, w - padR + 5, hy);
+      }
+    }
+
+    async function openStockDrawer(symbol) {
+      const sym = (symbol || '2330').trim().toUpperCase();
+      drawerState.symbol = sym;
+      const backdrop = document.getElementById('stockDrawerBackdrop');
+      if (backdrop) backdrop.classList.add('open');
+
+      switchDrawerTab('kline');
+
+      try {
+        const res = await fetch('/api/stock-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: sym,
+            atr_period: state.atrPeriod,
+            atr_multiplier: state.atrMultiplier,
+            base_position_pct: state.basePositionPct,
+          }),
+        });
+        const data = await res.json();
+        drawerState.rawData = data;
+        drawerState.name = data.name;
+        drawerState.price = data.current_price;
+
+        document.getElementById('drawerStockName').textContent = data.name;
+        document.getElementById('drawerStockSymbol').textContent = data.symbol;
+        document.getElementById('drawerStockSector').textContent = `${data.market}・${data.primary_sector}`;
+        document.getElementById('drawerStockPrice').textContent = Number(data.current_price).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+
+        const isUp = data.change_pct >= 0;
+        const chgEl = document.getElementById('drawerStockChange');
+        chgEl.textContent = `${isUp ? '+' : ''}${data.change_pct.toFixed(2)}%`;
+        chgEl.className = `badge ${isUp ? 'badge-up' : 'badge-down'}`;
+
+        const metaText = `開 ${(data.open || data.current_price).toFixed(1)} | 高 ${(data.high || data.current_price).toFixed(1)} | 低 ${(data.low || data.current_price).toFixed(1)}`;
+        document.getElementById('drawerStockLiveMeta').textContent = metaText;
+
+        // AI Summary Banner
+        document.getElementById('drawerDecisionBadge').textContent = data.decision.action;
+        document.getElementById('drawerDecisionBadge').className = `badge ${data.decision.action === 'STRONG_BUY' ? 'badge-up' : 'badge-blue'}`;
+        document.getElementById('drawerPositionAdvice').textContent = `建議配置 ${data.decision.position_pct}%`;
+        const pat = data.pattern_analysis;
+        document.getElementById('drawerPatternNote').textContent = `${pat ? pat.regime_state : '多頭續航'}・風報比 ${(pat?.target_modifier || 1.2).toFixed(1)}x`;
+
+        // Tab 1: K-Line
+        renderDrawerCandlestickChart(data.k_lines, pat ? pat.neckline_support : null);
+
+        // Tab 2: AI Patterns
+        const patternsListEl = document.getElementById('drawerAiPatternsList');
+        if (pat && pat.patterns && pat.patterns.length > 0) {
+          patternsListEl.innerHTML = pat.patterns.map((p) => {
+            const bCls = p.direction === 'BULLISH' ? 'badge-up' : (p.direction === 'BEARISH' ? 'badge-down' : 'badge-neutral');
+            return `
+              <div style="background:var(--bg-canvas); padding:10px 12px; border-radius:10px; border:1px solid var(--border-color);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span class="badge ${bCls}">${p.pattern_name_zh}</span>
+                  <span class="num" style="font-size:11px; color:var(--text-muted);">信賴度 ${(p.confidence_score * 100).toFixed(0)}%</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">${p.description}</div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          patternsListEl.innerHTML = `<div style="text-align:center; padding:16px; color:var(--text-muted); font-size:13px;">目前維持穩健多頭均線排列，無特殊破線轉折型態</div>`;
+        }
+
+        // Tab 3: Ladder
+        const entryMin = (data.current_price * 0.985).toFixed(1);
+        const entryMax = Number(data.current_price).toFixed(1);
+        document.getElementById('drawerLadderEntry').textContent = `${entryMin} ~ ${entryMax}`;
+        document.getElementById('drawerLadderStop').textContent = `${(data.decision.stop_loss || data.current_price * 0.935).toFixed(1)}`;
+        document.getElementById('drawerLadderTarget').textContent = `${(data.decision.target_price || data.current_price * 1.15).toFixed(1)}`;
+        document.getElementById('drawerLadderSteps').innerHTML = `
+          <div><strong>1. 初始進場保本：</strong>若拉回至建議區間分批承接，破停損價立即執行停損保護資金。</div>
+          <div style="margin-top:4px;"><strong>2. TP1 階梯停利：</strong>到達 +15% 減碼 35% 部位，並將停損線上移至買進成本建立無風險部位。</div>
+          <div style="margin-top:4px;"><strong>3. TP2 龍頭溢價：</strong>達共識目標價再減碼 35%，剩餘 30% 以 20MA 移動停利爭取波段超額報酬。</div>
+        `;
+
+        // Tab 4: Fundamentals & Flows
+        document.getElementById('drawerFundFScore').textContent = `${data.valuation.f_score}/9`;
+        document.getElementById('drawerFundRoe').textContent = `${data.valuation.roe}%`;
+        document.getElementById('drawerFundPe').textContent = `${data.valuation.pe}x`;
+        document.getElementById('drawerFundYield').textContent = `${data.valuation.dividend_yield}%`;
+        document.getElementById('drawerFundFlow').textContent = `5 日法人買賣超熱度：外資與投信偏多持續增持，法人庫存水位穩健。`;
+        document.getElementById('drawerFundThemes').textContent = (data.theme_tags || []).join(' / ') || '權值龍頭股';
+
+        // Watchlist status
+        const isWatched = (state.currentUser?.watchlist || []).some((w) => w.symbol === sym);
+        document.getElementById('drawerWatchlistBtn').textContent = isWatched ? '已在自選' : '+ 自選股';
+
+      } catch (e) {
+        console.error('Drawer stock analysis error:', e);
+      }
+    }
+
+    function closeStockDrawer() {
+      const backdrop = document.getElementById('stockDrawerBackdrop');
+      if (backdrop) backdrop.classList.remove('open');
+    }
+
+    function switchDrawerTab(tabId) {
+      drawerState.activeTab = tabId;
+      const tabMap = {
+        kline: 'drawerTabKline',
+        ai: 'drawerTabAi',
+        ladder: 'drawerTabLadder',
+        fund: 'drawerTabFund',
+      };
+      const btnMap = {
+        kline: 'drawerTabKlineBtn',
+        ai: 'drawerTabAiBtn',
+        ladder: 'drawerTabLadderBtn',
+        fund: 'drawerTabFundBtn',
+      };
+
+      Object.keys(tabMap).forEach((key) => {
+        const el = document.getElementById(tabMap[key]);
+        const btn = document.getElementById(btnMap[key]);
+        if (el) el.style.display = key === tabId ? 'block' : 'none';
+        if (btn) btn.classList.toggle('active', key === tabId);
+      });
+
+      if (tabId === 'kline') {
+        setTimeout(drawDrawerKlineCanvas, 50);
+      }
+    }
+
+    function refreshDrawerQuote() {
+      if (drawerState.symbol) {
+        openStockDrawer(drawerState.symbol);
+      }
+    }
+
+    function toggleWatchlistFromDrawer() {
+      if (!drawerState.symbol) return;
+      quickAddWatchlist(drawerState.symbol, drawerState.name, drawerState.price);
+      document.getElementById('drawerWatchlistBtn').textContent = '已在自選';
+    }
+
+    function openPositionSheetFromDrawer() {
+      const s = drawerState.symbol;
+      const n = drawerState.name;
+      const p = drawerState.price;
+      closeStockDrawer();
+      openPositionSheet(s, n, p);
+    }
+
+    function jumpToFullDiagnosisFromDrawer() {
+      const s = drawerState.symbol;
+      closeStockDrawer();
+      jumpToDiagnosis(s);
     }
 
     async function applyUserSettings() {
