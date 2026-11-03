@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>AlphaMind — 台股量化選股・ETF 專區・資產持倉管理</title>
+  <style>
+    :root {
+      --bg-canvas: #F6F7F9;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #F1F3F7;
+      --text-primary: #191F28;
+      --text-secondary: #4E5968;
+      --text-muted: #8B95A1;
+      --border-color: #EAEDF2;
+      --brand-blue: #2563EB;
+      --brand-blue-soft: #EFF6FF;
+      --up-color: #DC2626;
+      --up-bg: #FEF2F2;
+      --down-color: #16A34A;
+      --down-bg: #F0FDF4;
+      --warn-color: #D97706;
+      --warn-bg: #FFFBEB;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Noto Sans TC", sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 14px;
+      padding-bottom: 84px;
+    }
+
+    .num {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+
+    /* Top Header */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .topbar-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--brand-blue);
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    /* Desktop Navigation Tabs */
+    .desktop-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-subtle);
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .nav-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-btn.active {
+      background: var(--bg-surface);
+      color: var(--brand-blue);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .viewport-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      background: var(--bg-subtle);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #16A34A;
+    }
+
+    .quick-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .input-sm {
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 13px;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      outline: none;
+      width: 140px;
+    }
+
+    .input-sm:focus {
+      border-color: var(--brand-blue);
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      background: var(--brand-blue);
+      color: #FFFFFF;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      opacity: 0.92;
+    }
+
+    .btn-ghost {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-subtle);
+    }
+
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+
+    /* Mobile Fixed 5-Tab Bottom Bar */
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 120;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-color);
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .mob-tab {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 4px 0;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mob-tab svg {
+      width: 19px;
+      height: 19px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .mob-tab.active {
+      color: var(--brand-blue);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 18px 20px;
+    }
+
+    .view-panel {
+      display: none;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    /* Metric Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .card-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Segmented Pill Filters */
+    .pill-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+
+    .pill-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .pill {
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .pill.active {
+      background: var(--brand-blue);
+      color: #FFFFFF;
+      border-color: var(--brand-blue);
+    }
+
+    /* Grid Layouts */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    .grid-equal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .grid-3col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 11px 8px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr.clickable-row {
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    tr.clickable-row:hover {
+      background: #F8FAFC;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-up {
+      background: var(--up-bg);
+      color: var(--up-color);
+    }
+
+    .badge-down {
+      background: var(--down-bg);
+      color: var(--down-color);
+    }
+
+    .badge-blue {
+      background: var(--brand-blue-soft);
+      color: var(--brand-blue);
+    }
+
+    .badge-warn {
+      background: var(--warn-bg);
+      color: var(--warn-color);
+    }
+
+    .badge-neutral {
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+    }
+
+    .text-up {
+      color: var(--up-color);
+      font-weight: 600;
+    }
+
+    .text-down {
+      color: var(--down-color);
+      font-weight: 600;
+    }
+
+    .quote-flash {
+      animation: pulseBg 0.6s ease;
+    }
+
+    @keyframes pulseBg {
+      0% { background-color: rgba(37, 99, 235, 0.12); }
+      100% { background-color: transparent; }
+    }
+
+    /* Alert Cards */
+    .alert-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .alert-item {
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .alert-item.high {
+      border-left: 3px solid var(--up-color);
+    }
+
+    .alert-item.medium {
+      border-left: 3px solid var(--brand-blue);
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--brand-blue);
+      border-radius: 999px;
+    }
+
+    /* Form Controls */
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      align-items: end;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .field-input {
+      padding: 7px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 13px;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      width: 100%;
+    }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 960px) {
+      .desktop-nav {
+        display: none;
+      }
+      .mobile-bottom-nav {
+        display: grid;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .grid-2col, .grid-equal, .grid-3col {
+        grid-template-columns: 1fr;
+      }
+      .topbar-inner {
+        padding: 10px 14px;
+      }
+      .workspace {
+        padding: 12px 14px;
+      }
+      .viewport-status span.hide-mobile {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-group">
+        <div class="brand-mark">AM</div>
+        <div>
+          <div class="brand-title">AlphaMind</div>
+        </div>
+      </div>
+
+      <!-- Desktop Navigation -->
+      <nav class="desktop-nav">
+        <button class="nav-btn active" data-tab="screener" onclick="switchTab('screener')">選股與族群</button>
+        <button class="nav-btn" data-tab="diagnosis" onclick="switchTab('diagnosis')">個股與型態</button>
+        <button class="nav-btn" data-tab="etf" onclick="switchTab('etf')">台灣 ETF 專區</button>
+        <button class="nav-btn" data-tab="portfolio" onclick="switchTab('portfolio')">
+          資產與持倉
+          <span id="navAlertBadge" class="badge badge-up num" style="display:none; margin-left:4px;">0</span>
+        </button>
+        <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')">總經與設定</button>
+      </nav>
+
+      <!-- Viewport On-Demand Quote Status & Quick Symbol Lookup -->
+      <div class="topbar-right">
+        <div class="viewport-status" title="僅針對畫面可視範圍內之股票進行報價更新，保護 API 呼叫額度">
+          <span class="pulse-dot"></span>
+          <span class="hide-mobile">可視報價</span>
+          <span id="viewportCounter" class="num" style="font-weight:600;">0 檔</span>
+        </div>
+        <div class="quick-search">
+          <input id="globalSymbolInput" class="input-sm num" type="text" placeholder="輸入代號 如 2330" value="2330" onkeydown="if(event.key==='Enter') jumpToDiagnosis()" />
+          <button class="btn" onclick="jumpToDiagnosis()">診斷</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="workspace">
+
+    <!-- =================================================================== -->
+    <!-- VIEW 1: 選股建議與台股全市場族群分類 (Screener & Sectors)             -->
+    <!-- =================================================================== -->
+    <section id="view-screener" class="view-panel active">
+      <div class="kpi-grid">
+        <div class="card">
+          <div class="kpi-label">總經部位乘數 (6 國利差模型)</div>
+          <div id="kpiMacroMult" class="kpi-value num">0.95x</div>
+          <div id="kpiMacroSub" class="kpi-sub">美台日韓港歐資金風險中性</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">領漲主力族群</div>
+          <div id="kpiTopSector" class="kpi-value">半導體 / CoWoS</div>
+          <div id="kpiTopSectorSub" class="kpi-sub num">近 5 日法人淨流入領先</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">多因子選股入選檔數</div>
+          <div id="kpiScreenerCount" class="kpi-value num">-- 檔</div>
+          <div class="kpi-sub">F-Score + 籌碼 + K 線型態 + 風報比</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">即時報價 API 節流狀態</div>
+          <div id="kpiQuoteStatus" class="kpi-value num">按需更新</div>
+          <div id="kpiQuoteSub" class="kpi-sub">僅更新畫面可視標的 (5 秒快取)</div>
+        </div>
+      </div>
+
+      <!-- 熱門產業與概念族群資金流向橫條 -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">台股產業與概念族群分類</div>
+            <div class="card-subtitle">點擊任一產業或概念標籤，立即篩選成分股並更新可視報價</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <label style="font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
+              <input type="checkbox" id="chkLiveTwse" onchange="loadScreener()" />
+              同步證交所 OpenAPI 全市場清單
+            </label>
+          </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <div class="field-label" style="margin-bottom:6px;">主產業分類</div>
+          <div id="sectorPills" class="pill-bar"></div>
+        </div>
+        <div>
+          <div class="field-label" style="margin-bottom:6px;">熱門概念族群分類</div>
+          <div id="themePills" class="pill-bar"></div>
+        </div>
+      </div>
+
+      <!-- 多因子選股建議與全市場清單 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">智慧選股建議與防過擬合策略篩選</div>
+            <div class="card-subtitle">結合基本面 F-Score、法人籌碼、K 線吞噬/突破型態與最小風險報酬比，排除單一指標過度最佳化</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input id="screenerSearchInput" class="input-sm" type="text" placeholder="搜尋代號/名稱/題材..." oninput="loadScreener()" />
+            <button class="btn btn-ghost btn-xs" onclick="pollVisibleQuotesNow()">立即刷新畫面報價</button>
+          </div>
+        </div>
+
+        <div class="pill-bar" style="margin-bottom: 14px;" id="strategyProfilePills">
+          <button class="pill active" data-profile="ALL" onclick="selectStrategyProfile('ALL')">全部多頭推薦</button>
+          <button class="pill" data-profile="MOMENTUM_BREAKOUT" onclick="selectStrategyProfile('MOMENTUM_BREAKOUT')">量價動能突破</button>
+          <button class="pill" data-profile="PATTERN_REVERSAL" onclick="selectStrategyProfile('PATTERN_REVERSAL')">K 線吞噬與底部轉折</button>
+          <button class="pill" data-profile="VALUE_MOAT" onclick="selectStrategyProfile('VALUE_MOAT')">高 ROE 價值護城河</button>
+          <button class="pill" data-profile="HIGH_YIELD_DEFENSE" onclick="selectStrategyProfile('HIGH_YIELD_DEFENSE')">高殖利率防禦</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>代號 / 名稱</th>
+                <th>產業與概念族群</th>
+                <th>即時現價</th>
+                <th>漲跌幅</th>
+                <th>K 線型態評估</th>
+                <th>F-Score / 本益比</th>
+                <th>5 日法人(張)</th>
+                <th>建議區間 / 停損 / 目標價</th>
+                <th>風報比</th>
+                <th>策略訊號</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="screenerTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 2: 個股深度診斷、K 線型態辨識與雙軌停利停損 (Diagnosis)          -->
+    <!-- =================================================================== -->
+    <section id="view-diagnosis" class="view-panel">
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h2 id="diagTitle" style="font-size:20px; font-weight:700;">2330 台積電</h2>
+              <span id="diagSectorBadge" class="badge badge-blue">半導體</span>
+              <span id="diagActionBadge" class="badge badge-up">STRONG_BUY</span>
+            </div>
+            <div id="diagThemeTags" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="display:flex; align-items:baseline; gap:8px; justify-content:flex-end;">
+              <span id="diagPrice" class="num" style="font-size:26px; font-weight:700;" data-quote-symbol="2330">1,050.0</span>
+              <span id="diagChange" class="num text-up" style="font-size:14px;">+1.94%</span>
+            </div>
+            <div style="display:flex; gap:6px; margin-top:6px; justify-content:flex-end;">
+              <button class="btn btn-ghost btn-xs" onclick="quickAddWatchlistFromDiag()">加入自選股</button>
+              <button class="btn btn-xs" onclick="quickAddPositionFromDiag()">加入持倉計算</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2col" style="margin-bottom: 16px;">
+        <!-- 左側：K 線走勢與 Chandelier 停損軌跡 + K 線型態辨識卡 -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">日 K 線結構、月線頸線與 ATR Chandelier 移動停損線</div>
+              <div class="card-subtitle">實線為收盤價，藍色虛線為動態 Chandelier 停損防線（破線後自動重定錨避免高點鎖死）</div>
+            </div>
+            <span id="diagPatternRegimeBadge" class="badge badge-blue">多頭續航突破</span>
+          </div>
+
+          <div id="klineChartContainer" style="width:100%; height:240px; margin-bottom:14px;"></div>
+
+          <!-- K 線型態轉變與預測修正面板 -->
+          <div style="background:var(--bg-subtle); border-radius:var(--radius-md); padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+              <div style="font-weight:700; font-size:13px;">K 線型態辨識與目標價修正評估</div>
+              <div class="num" style="font-size:12px; color:var(--text-secondary);">
+                型態目標價乘數：<strong id="diagPatternModifier">1.03x</strong> |
+                頸線支撐：<strong id="diagNeckline">1,015.0</strong> |
+                上方壓力：<strong id="diagResistance">1,080.0</strong>
+              </div>
+            </div>
+            <div id="diagTransitionAlert" style="display:none; margin-bottom:8px; padding:8px 10px; border-radius:6px; background:var(--warn-bg); color:var(--warn-color); font-size:12px; font-weight:600;"></div>
+            <div id="diagPatternList" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px;"></div>
+          </div>
+        </div>
+
+        <!-- 右側：雙軌停利停損（現價進場 vs 持倉均價策略） -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">雙軌停利停損策略計算機</div>
+              <div class="card-subtitle">區分「空手現價進場」與「已持倉購入均價」</div>
+            </div>
+          </div>
+
+          <!-- 軌道 A：現價進場預測 -->
+          <div style="border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span style="font-weight:700; font-size:13px;">A. 現價進場評估 (空手未持倉)</span>
+              <span id="unallocBadge" class="badge badge-up">具備安全邊際</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+              <div>建議掛單區間：<strong id="unallocEntry" class="num">--</strong></div>
+              <div>初始硬停損價：<strong id="unallocStop" class="num text-down">--</strong></div>
+              <div>共識目標價 (含型態)：<strong id="unallocTarget" class="num text-up">--</strong></div>
+              <div>風險報酬比：<strong id="unallocRR" class="num">--</strong></div>
+            </div>
+          </div>
+
+          <!-- 軌道 B：持倉均價動態策略 -->
+          <div style="border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:700; font-size:13px;">B. 持倉均價策略推薦 (已買進持有)</span>
+              <span id="allocBadge" class="badge badge-blue">HOLD_AND_TRAILING</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+              <span style="font-size:12px; color:var(--text-secondary);">您的買進均價：</span>
+              <input id="diagCostInput" class="input-sm num" type="number" step="0.5" value="950" style="width:100px;" />
+              <button class="btn btn-xs" onclick="recalcDualStops()">計算持倉策略</button>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; margin-bottom:8px;">
+              <div>未實現報酬率：<strong id="allocPnlPct" class="num">--</strong></div>
+              <div>保本防護停損 (+8%啟動)：<strong id="allocBreakEven" class="num">--</strong></div>
+              <div>有效移動停損價：<strong id="allocTrailingStop" class="num text-down">--</strong></div>
+              <div>Tier 1 / Tier 2 停利：<strong id="allocTiers" class="num text-up">--</strong></div>
+            </div>
+            <div id="allocRationale" style="font-size:12px; color:var(--text-secondary); background:var(--bg-subtle); padding:8px; border-radius:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 下方：AI 雙向辯證中性裁決 + 持有該股之台灣 ETF 清單 -->
+      <div class="grid-equal">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">AI 多空雙向辯證與中性裁決</div>
+              <div class="card-subtitle">強制並列正方動能與紅隊反方風險，給出不偏頗之中立信賴度評分</div>
+            </div>
+            <span id="aiConfidenceBadge" class="badge badge-blue num">中立信賴度 --</span>
+          </div>
+          <p id="aiNeutralVerdict" style="font-size:13px; color:var(--text-primary); margin-bottom:12px; line-height:1.6;"></p>
+          <div class="grid-equal" style="gap:10px;">
+            <div style="background:var(--up-bg); padding:10px; border-radius:8px;">
+              <div style="font-weight:700; font-size:12px; color:var(--up-color); margin-bottom:6px;">正方量化支持依據</div>
+              <ul id="aiBullList" style="padding-left:16px; font-size:12px; color:var(--text-primary);"></ul>
+            </div>
+            <div style="background:var(--down-bg); padding:10px; border-radius:8px;">
+              <div style="font-weight:700; font-size:12px; color:var(--down-color); margin-bottom:6px;">反方紅隊壓力測試風險</div>
+              <ul id="aiBearList" style="padding-left:16px; font-size:12px; color:var(--text-primary);"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">持有此個股之台灣 ETF 權重分佈</div>
+              <div class="card-subtitle">追蹤被動式基金買盤支撐與高股息/市值型 ETF 換股影響</div>
+            </div>
+            <span id="diagEtfHolderCount" class="badge badge-neutral num">0 檔 ETF 持有</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ETF 代號 / 名稱</th>
+                  <th>類別</th>
+                  <th>持有權重</th>
+                  <th>估計持股(張)</th>
+                  <th>ETF 規模(億)</th>
+                </tr>
+              </thead>
+              <tbody id="diagEtfHoldersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 3: 台灣全 ETF 專區 (成分股查詢、報酬率比較、個股反查)             -->
+    <!-- =================================================================== -->
+    <section id="view-etf" class="view-panel">
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">台灣全 ETF 專區 — 各期報酬率排行與折溢價監控</div>
+            <div class="card-subtitle">涵蓋市值型、高股息、科技半導體、長天期美債/投等債與海外科技 ETF，點擊任一列查看完整成分股權重</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px; color:var(--text-secondary);">報酬排序：</span>
+            <select id="etfSortSelect" class="input-sm" style="width:130px;" onchange="loadEtfHub()">
+              <option value="YTD">今年以來 (YTD)</option>
+              <option value="1M">近 1 個月 (1M)</option>
+              <option value="3M">近 3 個月 (3M)</option>
+              <option value="6M">近 6 個月 (6M)</option>
+              <option value="1Y">近 1 年 (1Y)</option>
+              <option value="3Y">近 3 年 (3Y)</option>
+              <option value="YIELD">年化殖利率</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="etfCategoryPills" class="pill-bar" style="margin-bottom: 14px;">
+          <button class="pill active" data-cat="ALL" onclick="selectEtfCategory('ALL')">全部台灣 ETF</button>
+          <button class="pill" data-cat="市值型" onclick="selectEtfCategory('市值型')">市值型</button>
+          <button class="pill" data-cat="高股息" onclick="selectEtfCategory('高股息')">高股息型</button>
+          <button class="pill" data-cat="科技與半導體" onclick="selectEtfCategory('科技與半導體')">科技與半導體</button>
+          <button class="pill" data-cat="債券型" onclick="selectEtfCategory('債券型')">美債與投等債</button>
+          <button class="pill" data-cat="海外與槓桿" onclick="selectEtfCategory('海外與槓桿')">海外科技巨頭</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ETF 代號 / 名稱</th>
+                <th>分類 / 配息</th>
+                <th>市價 / 淨值</th>
+                <th>折溢價率</th>
+                <th>年化殖利率</th>
+                <th>1M 報酬</th>
+                <th>3M 報酬</th>
+                <th>6M 報酬</th>
+                <th>YTD 報酬</th>
+                <th>1Y 報酬</th>
+                <th>內扣費用</th>
+                <th>規模(億)</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="etfTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ETF 成分股明細查詢 + 個股反查被哪些 ETF 持有 -->
+      <div class="grid-equal">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div id="etfDetailTitle" class="card-title">0050 元大台灣50 — 成分股與權重明細</div>
+              <div id="etfDetailSub" class="card-subtitle">追蹤指數：臺灣50指數</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>成分股代號 / 名稱</th>
+                  <th>產業分類</th>
+                  <th>權重佔比 (%)</th>
+                  <th>持有張數</th>
+                  <th>診斷</th>
+                </tr>
+              </thead>
+              <tbody id="etfConstituentsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">個股反查持有 ETF 工具</div>
+              <div class="card-subtitle">輸入任一台股代號或名稱，查詢哪些台灣 ETF 將其列為核心成分股</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input id="etfReverseInput" class="input-sm num" type="text" value="2330" placeholder="如 2330, 2603" style="width:110px;" />
+              <button class="btn btn-xs" onclick="loadEtfHub()">反查</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ETF 代號 / 名稱</th>
+                  <th>ETF 類別</th>
+                  <th>標的名稱</th>
+                  <th>佔該 ETF 權重</th>
+                  <th>持股張數</th>
+                </tr>
+              </thead>
+              <tbody id="etfReverseBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 4: 資產計算、持倉目標價/型態轉變提醒與自選股管理 (Portfolio)     -->
+    <!-- =================================================================== -->
+    <section id="view-portfolio" class="view-panel">
+      <!-- 資產總覽 KPI -->
+      <div class="kpi-grid">
+        <div class="card">
+          <div class="kpi-label">總資產淨值 (現金 + 持倉變現淨值)</div>
+          <div id="portTotalEquity" class="kpi-value num">NT$ --</div>
+          <div id="portAllocationSub" class="kpi-sub num">持股佔比 --% | 現金 --%</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">持倉總市值 / 投入總成本</div>
+          <div id="portMarketVal" class="kpi-value num">NT$ --</div>
+          <div id="portCostSub" class="kpi-sub num">含買進手續費總成本 NT$ --</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">預估淨未實現損益 (已扣手續費與證交稅)</div>
+          <div id="portNetPnl" class="kpi-value num">NT$ --</div>
+          <div id="portNetPnlPct" class="kpi-sub num">淨報酬率 --%</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">可用現金部位 (可隨時調整)</div>
+          <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
+            <input id="portCashInput" class="input-sm num" type="number" step="10000" value="1500000" style="width:130px; font-weight:700;" />
+            <button class="btn btn-xs" onclick="saveCashBalance()">更新現金</button>
+          </div>
+          <div class="kpi-sub">台股賣出稅率：一般股 0.3% / ETF 0.1%</div>
+        </div>
+      </div>
+
+      <!-- 智慧提醒中心：到達策略目標價提醒 + 停損警示 + K 線型態轉變提醒 -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">持倉目標價達標與 K 線型態轉變提醒中心</div>
+            <div class="card-subtitle">自動比對持倉現價是否到達策略目標價、逼近有效停損線，或出現 K 線型態轉變訊號</div>
+          </div>
+          <span id="alertTotalBadge" class="badge badge-up num">0 則提醒</span>
+        </div>
+        <div id="smartAlertsContainer" class="alert-list"></div>
+      </div>
+
+      <!-- 持倉計算與管理表格 -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">持倉部位損益與策略目標價管理</div>
+            <div class="card-subtitle">支援設定購入均價、持有股數與自訂目標/停損價；未填自訂目標價時自動套用策略目標價 (+15% Tier 1) 與移動停損</div>
+          </div>
+        </div>
+
+        <!-- 新增或修改持倉表單 -->
+        <div style="background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); margin-bottom:14px;">
+          <div class="form-row">
+            <div class="field-group">
+              <label class="field-label">股票/ETF 代號</label>
+              <input id="posSymInput" class="field-input num" type="text" placeholder="如 2330" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">持有股數 (1張=1000股)</label>
+              <input id="posSharesInput" class="field-input num" type="number" value="1000" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">買進均價 (TWD)</label>
+              <input id="posCostInput" class="field-input num" type="number" step="0.1" placeholder="購入成本" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">策略目標價提醒 (選填)</label>
+              <input id="posTargetInput" class="field-input num" type="number" step="0.1" placeholder="預設自動計算" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">自訂停損價 (選填)</label>
+              <input id="posStopInput" class="field-input num" type="number" step="0.1" placeholder="預設自動保本/ATR" />
+            </div>
+            <div>
+              <button class="btn" style="width:100%; padding:8px 12px;" onclick="submitUpsertPosition()">儲存持倉部位</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>標的代號 / 名稱</th>
+                <th>股數</th>
+                <th>買進均價</th>
+                <th>即時現價</th>
+                <th>淨未實現損益 (含稅費)</th>
+                <th>策略目標價 (差距)</th>
+                <th>有效停損價 (安全邊際)</th>
+                <th>當前 K 線型態</th>
+                <th>持倉動作建議</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="positionsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 自選股清單與理想買點監控 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">自選股追蹤清單</div>
+            <div class="card-subtitle">設定理想承接提醒價，並即時查看 K 線型態與五道閘門風險報酬比</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <input id="watchSymInput" class="input-sm num" type="text" placeholder="代號 如 2454" style="width:110px;" />
+            <input id="watchTargetInput" class="input-sm num" type="number" step="0.5" placeholder="理想買進提醒價" style="width:130px;" />
+            <button class="btn btn-xs" onclick="submitAddWatchlist()">新增自選股</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>代號 / 名稱</th>
+                <th>產業分類</th>
+                <th>即時現價</th>
+                <th>漲跌幅</th>
+                <th>自訂買點提醒價</th>
+                <th>策略建議進場區間</th>
+                <th>初始停損 / 共識目標</th>
+                <th>K 線型態</th>
+                <th>風報比</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="watchlistTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 5: 6 國總經監控、個人化策略參數設定與防過擬合檢驗 (Settings)      -->
+    <!-- =================================================================== -->
+    <section id="view-settings" class="view-panel">
+      <div class="grid-equal" style="margin-bottom: 16px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">個人化量化參數與報價節流設定</div>
+              <div class="card-subtitle">所有設定會即時套用至選股器、ATR 移動停損計算與畫面可視報價輪詢頻率</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="field-group">
+              <label class="field-label">ATR 波動計算週期 (日)</label>
+              <input id="cfgAtrPeriod" class="field-input num" type="number" value="14" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Chandelier 停損 ATR 倍數</label>
+              <input id="cfgAtrMult" class="field-input num" type="number" step="0.1" value="2.5" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">單筆建議基準部位上限 (%)</label>
+              <input id="cfgBasePosPct" class="field-input num" type="number" value="15" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">券商電子手續費折數 (如 0.6 = 六折)</label>
+              <input id="cfgFeeDiscount" class="field-input num" type="number" step="0.05" value="0.60" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">選股最低 Piotroski F-Score (0~9)</label>
+              <input id="cfgMinFScore" class="field-input num" type="number" value="6" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">畫面可視股票報價更新週期 (秒)</label>
+              <select id="cfgPollInterval" class="field-input num" onchange="updatePollingInterval()">
+                <option value="5">每 5 秒自動更新可視標的</option>
+                <option value="10" selected>每 10 秒自動更新可視標的 (推薦省額度)</option>
+                <option value="20">每 20 秒自動更新可視標的</option>
+                <option value="0">僅手動點擊更新</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+            <button class="btn" onclick="applyUserSettings()">套用參數設定</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">策略防過擬合 (Anti-Overfitting) 與防過度理想保護機制</div>
+              <div class="card-subtitle">系統內建四大實盤防護，確保回測與選股建議符合台股真實交易摩擦</div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+            <div style="padding:10px; background:var(--bg-subtle); border-radius:8px;">
+              <strong>1. Chandelier 破線重定錨機制 (消除歷史高點鎖死)</strong>
+              <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">
+                修正傳統移動停損從頭到尾單向遞增導致高檔修正股永遠處於破線鎖死的問題；當收盤跌破停損線完成出場後，次日自動重設局部波動錨點，待收復 20MA 重新啟動波段保護。
+              </div>
+            </div>
+            <div style="padding:10px; background:var(--bg-subtle); border-radius:8px;">
+              <strong>2. 隔夜跳空開低與實盤滑價精算 (`min(Open, Stop)`)</strong>
+              <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">
+                禁止回測在跳空開低時以理想停損價成交；若開盤價低於停損價，強制以開盤價再扣除 0.15% 滑價與 0.3% 證交稅、手續費計算真實損益。
+              </div>
+            </div>
+            <div style="padding:10px; background:var(--bg-subtle); border-radius:8px;">
+              <strong>3. Point-in-Time 財報法定揭露日對齊與高原穩定度檢定</strong>
+              <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">
+                嚴格 enforces Q1(5/15)、Q2(8/14)、Q3(11/14)、年報(3/31) 法定截止日，杜絕偷看未來財報；K 線型態對目標價修正係數限制於 0.94x ~ 1.06x，防止極端外推。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 國總經與匯率即時監控表 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">美、台、日、韓、港、歐 6 國央行政策利率、殖利率利差與匯率監控</div>
+            <div class="card-subtitle">偵測日圓利差交易平倉風險 (JPY Carry Unwind) 與亞洲匯率資金外逃壓力</div>
+          </div>
+        </div>
+        <div id="macroRegionsGrid" class="grid-3col"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Mobile Fixed 5-Tab Bottom Navigation -->
+  <nav class="mobile-bottom-nav">
+    <button class="mob-tab active" data-tab="screener" onclick="switchTab('screener')">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
+      <span>選股族群</span>
+    </button>
+    <button class="mob-tab" data-tab="diagnosis" onclick="switchTab('diagnosis')">
+      <svg viewBox="0 0 24 24"><path d="M9 3v18"/><path d="M6 7h6v8H6z"/><path d="M17 5v14"/><path d="M14 9h6v6h-6z"/></svg>
+      <span>個股型態</span>
+    </button>
+    <button class="mob-tab" data-tab="etf" onclick="switchTab('etf')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg>
+      <span>ETF專區</span>
+    </button>
+    <button class="mob-tab" data-tab="portfolio" onclick="switchTab('portfolio')">
+      <svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5z"/><path d="M16 12h5"/></svg>
+      <span>資產持倉</span>
+    </button>
+    <button class="mob-tab" data-tab="settings" onclick="switchTab('settings')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>總經設定</span>
+    </button>
+  </nav>
+
+  <script>
+    // =========================================================================
+    // Global State & User Preferences
+    // =========================================================================
+    const state = {
+      activeTab: 'screener',
+      selectedSector: 'ALL',
+      selectedTheme: 'ALL',
+      selectedProfile: 'ALL',
+      selectedEtfCategory: 'ALL',
+      selectedEtfSymbol: '0050',
+      currentDiagSymbol: '2330',
+      currentDiagPrice: 1050.0,
+      currentDiagName: '台積電',
+      atrPeriod: 14,
+      atrMultiplier: 2.5,
+      basePositionPct: 15.0,
+      minFScore: 6,
+      feeDiscount: 0.60,
+      pollIntervalSec: 10,
+      visibleSymbols: new Set(),
+      pollTimer: null,
+      observer: null,
+    };
+
+    // =========================================================================
+    // Viewport-Aware On-Demand Quote Tracker (IntersectionObserver)
+    // Only updates quotes for symbols currently visible on the user's screen
+    // =========================================================================
+    function initViewportObserver() {
+      if (state.observer) {
+        state.observer.disconnect();
+      }
+      state.visibleSymbols.clear();
+
+      state.observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const sym = entry.target.getAttribute('data-quote-symbol');
+          if (!sym) return;
+          if (entry.isIntersecting) {
+            state.visibleSymbols.add(sym);
+          } else {
+            state.visibleSymbols.delete(sym);
+          }
+        });
+        document.getElementById('viewportCounter').textContent = `${state.visibleSymbols.size} 檔`;
+      }, { threshold: 0.1 });
+
+      observeAllQuoteNodes();
+    }
+
+    function observeAllQuoteNodes() {
+      if (!state.observer) return;
+      state.observer.disconnect();
+      state.visibleSymbols.clear();
+      document.querySelectorAll('[data-quote-symbol]').forEach((el) => {
+        state.observer.observe(el);
+      });
+    }
+
+    async function pollVisibleQuotesNow() {
+      const syms = Array.from(state.visibleSymbols).slice(0, 20);
+      if (syms.length === 0) return;
+
+      try {
+        const res = await fetch(`/api/quotes/batch?symbols=${encodeURIComponent(syms.join(','))}`);
+        const data = await res.json();
+        if (!data.quotes) return;
+
+        Object.values(data.quotes).forEach((q) => {
+          const priceNodes = document.querySelectorAll(`[data-quote-price="${q.symbol}"]`);
+          priceNodes.forEach((node) => {
+            const oldTxt = node.textContent;
+            const newTxt = Number(q.price).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+            if (oldTxt !== newTxt) {
+              node.textContent = newTxt;
+              node.classList.remove('quote-flash');
+              void node.offsetWidth;
+              node.classList.add('quote-flash');
+            }
+          });
+
+          const chgNodes = document.querySelectorAll(`[data-quote-chg="${q.symbol}"]`);
+          chgNodes.forEach((node) => {
+            const sign = q.change_pct > 0 ? '+' : '';
+            node.textContent = `${sign}${Number(q.change_pct).toFixed(2)}%`;
+            node.className = `num ${q.change_pct >= 0 ? 'text-up' : 'text-down'}`;
+          });
+        });
+
+        document.getElementById('kpiQuoteStatus').textContent = `${data.requested_count} 檔同步`;
+        document.getElementById('kpiQuoteSub').textContent = `快取命中 ${data.cache_hits} | 更新於 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+      } catch (e) {
+        console.error('Viewport quote poll error:', e);
+      }
+    }
+
+    function updatePollingInterval() {
+      const val = parseInt(document.getElementById('cfgPollInterval').value, 10);
+      state.pollIntervalSec = val;
+      if (state.pollTimer) {
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
+      }
+      if (val > 0) {
+        state.pollTimer = setInterval(pollVisibleQuotesNow, val * 1000);
+      }
+    }
+
+    // =========================================================================
+    // Navigation Switching
+    // =========================================================================
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      document.querySelectorAll('.view-panel').forEach((p) => p.classList.remove('active'));
+      const target = document.getElementById(`view-${tabId}`);
+      if (target) target.classList.add('active');
+
+      document.querySelectorAll('.nav-btn, .mob-tab').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+      });
+
+      if (tabId === 'screener') loadScreener();
+      if (tabId === 'diagnosis') loadStockDiagnosis(state.currentDiagSymbol);
+      if (tabId === 'etf') loadEtfHub();
+      if (tabId === 'portfolio') loadPortfolio();
+
+      setTimeout(observeAllQuoteNodes, 120);
+    }
+
+    function jumpToDiagnosis(sym) {
+      const targetSym = sym || document.getElementById('globalSymbolInput').value.trim().toUpperCase() || '2330';
+      document.getElementById('globalSymbolInput').value = targetSym;
+      state.currentDiagSymbol = targetSym;
+      switchTab('diagnosis');
+    }
+
+    // =========================================================================
+    // View 1: Overview, Sectors & Multi-Factor Stock Screener
+    // =========================================================================
+    async function loadOverview() {
+      try {
+        const res = await fetch('/api/overview');
+        const data = await res.json();
+        document.getElementById('kpiMacroMult').textContent = `${data.macro_multiplier.toFixed(2)}x`;
+        document.getElementById('kpiMacroSub').textContent = `DXY ${data.dxy} | 10Y-2Y 利差 ${data.us_yield_spread.toFixed(2)}%`;
+
+        if (data.sector_summary && data.sector_summary.themes && data.sector_summary.themes.length > 0) {
+          const topT = data.sector_summary.themes[0];
+          document.getElementById('kpiTopSector').textContent = topT.theme_name;
+          document.getElementById('kpiTopSectorSub').textContent = `平均 ${topT.avg_change_pct >= 0 ? '+' : ''}${topT.avg_change_pct}% | 領頭羊 ${topT.leading_stock}`;
+        }
+
+        // Render 6-region macro cards in Settings view
+        const regGrid = document.getElementById('macroRegionsGrid');
+        if (regGrid && data.regions) {
+          regGrid.innerHTML = Object.entries(data.regions).map(([code, info]) => `
+            <div style="padding:12px; border:1px solid var(--border-color); border-radius:10px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="font-weight:700;">${code} 市場</span>
+                <span class="badge badge-neutral num">10Y 殖利率 ${info.yield_10y}%</span>
+              </div>
+              <div class="num" style="font-size:12px; color:var(--text-secondary);">
+                央行政策利率：<strong>${info.policy_rate}%</strong> | 波動率指數：<strong>${info.vix}</strong>
+                ${info.stance ? `<div style="margin-top:4px; color:var(--brand-blue);">${info.stance}</div>` : ''}
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function selectStrategyProfile(profile) {
+      state.selectedProfile = profile;
+      document.querySelectorAll('#strategyProfilePills .pill').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-profile') === profile);
+      });
+      loadScreener();
+    }
+
+    function selectSectorFilter(sec) {
+      state.selectedSector = sec;
+      loadScreener();
+    }
+
+    function selectThemeFilter(theme) {
+      state.selectedTheme = theme;
+      loadScreener();
+    }
+
+    async function loadScreener() {
+      const search = document.getElementById('screenerSearchInput').value.trim();
+      const live = document.getElementById('chkLiveTwse').checked ? '1' : '0';
+      const url = `/api/screener?profile=${encodeURIComponent(state.selectedProfile)}&sector=${encodeURIComponent(state.selectedSector)}&theme=${encodeURIComponent(state.selectedTheme)}&search=${encodeURIComponent(search)}&min_f=${state.minFScore}&live=${live}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Render Sector Pills
+        const secContainer = document.getElementById('sectorPills');
+        const sectors = data.sector_summary ? data.sector_summary.sectors : [];
+        secContainer.innerHTML = `
+          <button class="pill ${state.selectedSector === 'ALL' ? 'active' : ''}" onclick="selectSectorFilter('ALL')">全部產業 (${data.sector_summary ? data.sector_summary.total_tracked_stocks : '--'})</button>
+          ${sectors.map((s) => `
+            <button class="pill ${state.selectedSector === s.sector_name ? 'active' : ''}" onclick="selectSectorFilter('${s.sector_name}')">
+              ${s.sector_name} (${s.stock_count}) <span class="num">${s.avg_change_pct >= 0 ? '+' : ''}${s.avg_change_pct}%</span>
+            </button>
+          `).join('')}
+        `;
+
+        // Render Theme Pills
+        const themeContainer = document.getElementById('themePills');
+        const themes = data.sector_summary ? data.sector_summary.themes.slice(0, 14) : [];
+        themeContainer.innerHTML = `
+          <button class="pill ${state.selectedTheme === 'ALL' ? 'active' : ''}" onclick="selectThemeFilter('ALL')">全部概念題材</button>
+          ${themes.map((t) => `
+            <button class="pill ${state.selectedTheme === t.theme_name ? 'active' : ''}" onclick="selectThemeFilter('${t.theme_name}')">
+              ${t.theme_name} <span class="num">${t.avg_change_pct >= 0 ? '+' : ''}${t.avg_change_pct}%</span>
+            </button>
+          `).join('')}
+        `;
+
+        // Decide which list to show: if user searched or filtered theme, show matching universe; else show strategy screener recommendations
+        const listToRender = (search || state.selectedTheme !== 'ALL') ? data.stocks : (data.screener.recommendations.length > 0 ? data.screener.recommendations : data.stocks);
+        document.getElementById('kpiScreenerCount').textContent = `${listToRender.length} 檔`;
+
+        const tbody = document.getElementById('screenerTableBody');
+        tbody.innerHTML = listToRender.map((item) => {
+          const isUp = item.change_pct >= 0;
+          const kBadgeClass = item.kline_bias === 'BULLISH' ? 'badge-up' : (item.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
+          const actBadgeClass = item.gate_action === 'STRONG_BUY' ? 'badge-up' : (item.gate_action === 'ACCUMULATE' ? 'badge-blue' : 'badge-neutral');
+          return `
+            <tr class="clickable-row" data-quote-symbol="${item.symbol}" onclick="jumpToDiagnosis('${item.symbol}')">
+              <td>
+                <div style="font-weight:700;" class="num">${item.symbol} ${item.name}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${item.market}</div>
+              </td>
+              <td>
+                <div style="font-weight:600; font-size:12px;">${item.primary_sector}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${(item.theme_tags || []).slice(0, 2).join('・')}</div>
+              </td>
+              <td class="num" style="font-weight:700;" data-quote-price="${item.symbol}">${Number(item.price).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</td>
+              <td class="num ${isUp ? 'text-up' : 'text-down'}" data-quote-chg="${item.symbol}">${isUp ? '+' : ''}${Number(item.change_pct).toFixed(2)}%</td>
+              <td><span class="badge ${kBadgeClass}">${item.kline_pattern}</span></td>
+              <td class="num">${item.f_score}/9 <span style="color:var(--text-muted);">(${item.pe_ratio}x)</span></td>
+              <td class="num ${item.inst_flow_5d_lots >= 0 ? 'text-up' : 'text-down'}">${item.inst_flow_5d_lots >= 0 ? '+' : ''}${item.inst_flow_5d_lots.toLocaleString()}</td>
+              <td class="num" style="font-size:12px;">
+                <div>區間 ${item.entry_zone}</div>
+                <div style="color:var(--text-muted);">停損 <span class="text-down">${item.stop_loss}</span> / 目標 <span class="text-up">${item.consensus_target}</span></div>
+              </td>
+              <td class="num" style="font-weight:700;">${item.risk_reward}x</td>
+              <td><span class="badge ${actBadgeClass}">${item.gate_action}</span></td>
+              <td onclick="event.stopPropagation();">
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-ghost btn-xs" onclick="quickAddWatchlist('${item.symbol}', '${item.name}', ${item.price})">+自選</button>
+                  <button class="btn btn-ghost btn-xs" onclick="quickOpenPositionModal('${item.symbol}', '${item.name}', ${item.price})">+持倉</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        observeAllQuoteNodes();
+      } catch (e) {
+        console.error('Screener load error:', e);
+      }
+    }
+
+    // =========================================================================
+    // View 2: Individual Stock Diagnosis, Candlestick Pattern & Dual Stops
+    // =========================================================================
+    async function loadStockDiagnosis(symbol) {
+      const sym = (symbol || state.currentDiagSymbol || '2330').trim().toUpperCase();
+      state.currentDiagSymbol = sym;
+
+      try {
+        const res = await fetch('/api/stock-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: sym,
+            atr_period: state.atrPeriod,
+            atr_multiplier: state.atrMultiplier,
+            base_position_pct: state.basePositionPct,
+          }),
+        });
+        const data = await res.json();
+        state.currentDiagPrice = data.current_price;
+        state.currentDiagName = data.name;
+
+        document.getElementById('diagTitle').textContent = `${data.symbol} ${data.name}`;
+        document.getElementById('diagSectorBadge').textContent = `${data.market}・${data.primary_sector}`;
+        document.getElementById('diagActionBadge').textContent = `${data.decision.action} (建議部位 ${data.decision.position_pct}%)`;
+        document.getElementById('diagThemeTags').textContent = `概念族群：${(data.theme_tags || []).join(' / ')} | F-Score ${data.valuation.f_score}/9 | ROE ${data.valuation.roe}% | 殖利率 ${data.valuation.dividend_yield}%`;
+
+        const priceEl = document.getElementById('diagPrice');
+        priceEl.setAttribute('data-quote-symbol', data.symbol);
+        priceEl.setAttribute('data-quote-price', data.symbol);
+        priceEl.textContent = Number(data.current_price).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+
+        const chgEl = document.getElementById('diagChange');
+        chgEl.setAttribute('data-quote-chg', data.symbol);
+        const isUp = data.change_pct >= 0;
+        chgEl.textContent = `${isUp ? '+' : ''}${Number(data.change_pct).toFixed(2)}%`;
+        chgEl.className = `num ${isUp ? 'text-up' : 'text-down'}`;
+
+        // K-Line Pattern Analysis
+        const pat = data.pattern_analysis;
+        document.getElementById('diagPatternRegimeBadge').textContent = pat.regime_state;
+        document.getElementById('diagPatternModifier').textContent = `${pat.target_modifier}x`;
+        document.getElementById('diagNeckline').textContent = pat.neckline_support;
+        document.getElementById('diagResistance').textContent = pat.resistance_level;
+
+        const transAlert = document.getElementById('diagTransitionAlert');
+        if (pat.is_transition && pat.transition_alert) {
+          transAlert.style.display = 'block';
+          transAlert.textContent = `型態轉變提醒：${pat.transition_alert}`;
+        } else {
+          transAlert.style.display = 'none';
+        }
+
+        document.getElementById('diagPatternList').innerHTML = (pat.patterns || []).map((p) => {
+          const bCls = p.direction === 'BULLISH' ? 'badge-up' : (p.direction === 'BEARISH' ? 'badge-down' : 'badge-neutral');
+          return `
+            <div style="background:var(--bg-surface); padding:10px; border-radius:8px; border:1px solid var(--border-color);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="badge ${bCls}">${p.pattern_name_zh}</span>
+                <span class="num" style="font-size:11px; color:var(--text-muted);">信賴度 ${(p.confidence_score * 100).toFixed(0)}%</span>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary);">${p.description}</div>
+            </div>
+          `;
+        }).join('');
+
+        // Render SVG Candlestick + Chandelier Stop Chart
+        renderCandlestickChart(data.k_lines, pat.neckline_support);
+
+        // Render ETF Holders of this stock
+        const holders = (data.etf_holders && data.etf_holders.holders) || [];
+        document.getElementById('diagEtfHolderCount').textContent = `${holders.length} 檔台灣 ETF 持有`;
+        const hBody = document.getElementById('diagEtfHoldersBody');
+        if (holders.length === 0) {
+          hBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">目前未在前十大核心成分股名單內</td></tr>`;
+        } else {
+          hBody.innerHTML = holders.map((h) => `
+            <tr class="clickable-row" onclick="openEtfDetailFromDiag('${h.etf_symbol}')">
+              <td class="num" style="font-weight:700;">${h.etf_symbol} ${h.etf_name}</td>
+              <td><span class="badge badge-neutral">${h.category}</span></td>
+              <td class="num text-up">${h.weight_pct}%</td>
+              <td class="num">${h.shares_held_lots.toLocaleString()} 張</td>
+              <td class="num">${h.etf_aum_billion_twd.toLocaleString()} 億</td>
+            </tr>
+          `).join('');
+        }
+
+        // Default sample cost input to 91% of current price if not customized
+        document.getElementById('diagCostInput').value = Math.round(data.current_price * 0.91 * 10) / 10;
+        await recalcDualStops();
+        await loadAiSynthesis(sym, data.current_price);
+        observeAllQuoteNodes();
+      } catch (e) {
+        console.error('Diagnosis error:', e);
+      }
+    }
+
+    function renderCandlestickChart(kLines, necklinePrice) {
+      const container = document.getElementById('klineChartContainer');
+      if (!kLines || kLines.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      const w = 680;
+      const h = 230;
+      const padL = 46;
+      const padR = 16;
+      const padT = 14;
+      const padB = 24;
+
+      const allPrices = [];
+      kLines.forEach((d) => {
+        allPrices.push(d.high, d.low);
+        if (d.stop > 0) allPrices.push(d.stop);
+      });
+      if (necklinePrice > 0) allPrices.push(necklinePrice);
+
+      const minP = Math.min(...allPrices) * 0.992;
+      const maxP = Math.max(...allPrices) * 1.008;
+      const rangeP = Math.max(1, maxP - minP);
+
+      const xStep = (w - padL - padR) / kLines.length;
+      const yScale = (val) => padT + (h - padT - padB) * (1 - (val - minP) / rangeP);
+
+      let candlesSvg = '';
+      let stopPoints = [];
+
+      kLines.forEach((d, i) => {
+        const cx = padL + i * xStep + xStep / 2;
+        const isBull = d.close >= d.open;
+        const color = isBull ? '#DC2626' : '#16A34A';
+        const yHigh = yScale(d.high);
+        const yLow = yScale(d.low);
+        const yOpen = yScale(d.open);
+        const yClose = yScale(d.close);
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyH = Math.max(2.5, Math.abs(yClose - yOpen));
+        const candleW = Math.max(4, xStep * 0.58);
+
+        candlesSvg += `
+          <line x1="${cx}" y1="${yHigh}" x2="${cx}" y2="${yLow}" stroke="${color}" stroke-width="1.3" />
+          <rect x="${cx - candleW / 2}" y="${bodyTop}" width="${candleW}" height="${bodyH}" fill="${color}" rx="1" />
+        `;
+
+        if (d.stop && d.stop > 0) {
+          stopPoints.push(`${cx.toFixed(1)},${yScale(d.stop).toFixed(1)}`);
+        }
+      });
+
+      const yNeck = necklinePrice ? yScale(necklinePrice) : null;
+
+      container.innerHTML = `
+        <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:100%; overflow:visible;">
+          <line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="#EAEDF2" stroke-dasharray="3,3" />
+          <line x1="${padL}" y1="${h / 2}" x2="${w - padR}" y2="${h / 2}" stroke="#EAEDF2" stroke-dasharray="3,3" />
+          <line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="#EAEDF2" />
+          <text x="4" y="${padT + 4}" font-size="10" fill="#8B95A1">${maxP.toFixed(0)}</text>
+          <text x="4" y="${h / 2 + 4}" font-size="10" fill="#8B95A1">${((maxP + minP) / 2).toFixed(0)}</text>
+          <text x="4" y="${h - padB}" font-size="10" fill="#8B95A1">${minP.toFixed(0)}</text>
+          ${yNeck ? `<line x1="${padL}" y1="${yNeck}" x2="${w - padR}" y2="${yNeck}" stroke="#D97706" stroke-width="1.2" stroke-dasharray="4,4" />` : ''}
+          ${stopPoints.length > 1 ? `<polyline fill="none" stroke="#2563EB" stroke-width="2" stroke-dasharray="5,3" points="${stopPoints.join(' ')}" />` : ''}
+          ${candlesSvg}
+        </svg>
+      `;
+    }
+
+    async function recalcDualStops() {
+      const avgCost = parseFloat(document.getElementById('diagCostInput').value) || state.currentDiagPrice * 0.91;
+      try {
+        const res = await fetch('/api/dual-stops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: state.currentDiagSymbol,
+            current_price: state.currentDiagPrice,
+            avg_cost_price: avgCost,
+            atr_multiplier: state.atrMultiplier,
+          }),
+        });
+        const data = await res.json();
+        const u = data.unallocated;
+        const a = data.allocated;
+
+        document.getElementById('unallocBadge').textContent = u.is_favorable ? '具備安全邊際 (RR >= 2x)' : '風報比偏低宜等回檔';
+        document.getElementById('unallocBadge').className = `badge ${u.is_favorable ? 'badge-up' : 'badge-warn'}`;
+        document.getElementById('unallocEntry').textContent = `${u.entry_zone[0]} ~ ${u.entry_zone[1]}`;
+        document.getElementById('unallocStop').textContent = `${u.initial_stop} (-${u.max_risk_pct}%)`;
+        document.getElementById('unallocTarget').textContent = `${u.target_consensus} (型態 ${u.pattern_modifier}x)`;
+        document.getElementById('unallocRR').textContent = `${u.risk_reward_ratio}x`;
+
+        document.getElementById('allocBadge').textContent = a.recommendation;
+        document.getElementById('allocPnlPct').textContent = `${a.unrealized_pnl_pct >= 0 ? '+' : ''}${a.unrealized_pnl_pct}%`;
+        document.getElementById('allocPnlPct').className = `num ${a.unrealized_pnl_pct >= 0 ? 'text-up' : 'text-down'}`;
+        document.getElementById('allocBreakEven').textContent = a.break_even_active ? `已啟動 (${a.break_even_stop})` : '未達 +8% 門檻';
+        document.getElementById('allocTrailingStop').textContent = a.effective_trailing_stop;
+        document.getElementById('allocTiers').textContent = `${a.tier_1_target} / ${a.tier_2_target}`;
+        document.getElementById('allocRationale').textContent = a.rationale;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadAiSynthesis(symbol, price) {
+      const avgCost = parseFloat(document.getElementById('diagCostInput').value) || price * 0.91;
+      try {
+        const res = await fetch('/api/ai-synthesis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol,
+            current_price: price,
+            avg_cost_price: avgCost,
+          }),
+        });
+        const ai = await res.json();
+        document.getElementById('aiConfidenceBadge').textContent = `中立信賴度 ${ai.neutral_confidence_score}/100`;
+        document.getElementById('aiNeutralVerdict').textContent = `${ai.executive_summary} ${ai.conflict_resolution_analysis}`;
+        document.getElementById('aiBullList').innerHTML = (ai.bullish_supporting_evidence || []).map((t) => `<li>${t}</li>`).join('');
+        document.getElementById('aiBearList').innerHTML = (ai.bearish_counter_evidence || []).map((t) => `<li>${t}</li>`).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // =========================================================================
+    // View 3: Taiwan Full ETF Zone
+    // =========================================================================
+    function selectEtfCategory(cat) {
+      state.selectedEtfCategory = cat;
+      document.querySelectorAll('#etfCategoryPills .pill').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-cat') === cat);
+      });
+      loadEtfHub();
+    }
+
+    function selectEtfDetail(etfSym) {
+      state.selectedEtfSymbol = etfSym;
+      loadEtfHub();
+    }
+
+    function openEtfDetailFromDiag(etfSym) {
+      state.selectedEtfSymbol = etfSym;
+      switchTab('etf');
+    }
+
+    async function loadEtfHub() {
+      const sortBy = document.getElementById('etfSortSelect').value;
+      const revStock = document.getElementById('etfReverseInput').value.trim() || '2330';
+      const url = `/api/etfs?category=${encodeURIComponent(state.selectedEtfCategory)}&symbol=${encodeURIComponent(state.selectedEtfSymbol)}&reverse_stock=${encodeURIComponent(revStock)}&sort=${encodeURIComponent(sortBy)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const tbody = document.getElementById('etfTableBody');
+        tbody.innerHTML = (data.etf_list || []).map((e) => {
+          const isUp = e.change_pct >= 0;
+          const r = e.returns || {};
+          const fmtRet = (v) => `<span class="num ${v >= 0 ? 'text-up' : 'text-down'}">${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}%</span>`;
+          return `
+            <tr class="clickable-row" data-quote-symbol="${e.etf_symbol}" onclick="selectEtfDetail('${e.etf_symbol}')">
+              <td>
+                <div class="num" style="font-weight:700;">${e.etf_symbol} ${e.etf_name}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${e.issuer}</div>
+              </td>
+              <td>
+                <span class="badge badge-blue">${e.category}</span>
+                <span class="badge badge-neutral">${e.dividend_frequency}</span>
+              </td>
+              <td class="num">
+                <strong data-quote-price="${e.etf_symbol}">${e.price.toFixed(2)}</strong>
+                <div style="font-size:11px; color:var(--text-muted);">淨值 ${e.nav.toFixed(2)}</div>
+              </td>
+              <td class="num ${e.premium_discount_pct > 0.3 ? 'text-up' : ''}">${e.premium_discount_pct >= 0 ? '+' : ''}${e.premium_discount_pct.toFixed(2)}%</td>
+              <td class="num" style="font-weight:700;">${e.annual_yield_pct.toFixed(2)}%</td>
+              <td>${fmtRet(r['1M'] || 0)}</td>
+              <td>${fmtRet(r['3M'] || 0)}</td>
+              <td>${fmtRet(r['6M'] || 0)}</td>
+              <td>${fmtRet(r['YTD'] || 0)}</td>
+              <td>${fmtRet(r['1Y'] || 0)}</td>
+              <td class="num">${e.expense_ratio_pct.toFixed(2)}%</td>
+              <td class="num">${e.aum_billion_twd.toLocaleString()}</td>
+              <td onclick="event.stopPropagation();">
+                <button class="btn btn-ghost btn-xs" onclick="quickOpenPositionModal('${e.etf_symbol}', '${e.etf_name}', ${e.price})">+持倉</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Selected ETF Constituents
+        const det = data.selected_etf_detail;
+        if (det) {
+          document.getElementById('etfDetailTitle').textContent = `${det.etf_symbol} ${det.etf_name} — 成分股與權重明細`;
+          document.getElementById('etfDetailSub').textContent = `追蹤指數：${det.tracking_index} | 總費用率 ${det.expense_ratio_pct}% | 規模 ${det.aum_billion_twd.toLocaleString()} 億台幣`;
+          document.getElementById('etfConstituentsBody').innerHTML = (det.top_constituents || []).map((c) => `
+            <tr>
+              <td class="num" style="font-weight:700;">${c.stock_symbol} ${c.stock_name}</td>
+              <td><span class="badge badge-neutral">${c.sector}</span></td>
+              <td class="num">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <strong style="width:46px;">${c.weight_pct.toFixed(1)}%</strong>
+                  <div style="flex:1; height:6px; background:var(--bg-subtle); border-radius:999px; overflow:hidden;">
+                    <div style="width:${Math.min(100, c.weight_pct * 1.6)}%; height:100%; background:var(--brand-blue);"></div>
+                  </div>
+                </div>
+              </td>
+              <td class="num">${c.shares_held_lots > 0 ? c.shares_held_lots.toLocaleString() + ' 張' : '--'}</td>
+              <td>
+                ${/^\d{4}$/.test(c.stock_symbol) ? `<button class="btn btn-ghost btn-xs" onclick="jumpToDiagnosis('${c.stock_symbol}')">診斷</button>` : '--'}
+              </td>
+            </tr>
+          `).join('');
+        }
+
+        // Reverse Stock-to-ETF Lookup
+        const rev = data.reverse_stock_lookup;
+        const revBody = document.getElementById('etfReverseBody');
+        if (rev && rev.holders && rev.holders.length > 0) {
+          revBody.innerHTML = rev.holders.map((h) => `
+            <tr class="clickable-row" onclick="selectEtfDetail('${h.etf_symbol}')">
+              <td class="num" style="font-weight:700;">${h.etf_symbol} ${h.etf_name}</td>
+              <td><span class="badge badge-blue">${h.category}</span></td>
+              <td>${h.stock_symbol} ${h.stock_name}</td>
+              <td class="num text-up" style="font-weight:700;">${h.weight_pct.toFixed(1)}%</td>
+              <td class="num">${h.shares_held_lots.toLocaleString()} 張</td>
+            </tr>
+          `).join('');
+        } else {
+          revBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">查無持有「${revStock}」之前十大成分 ETF</td></tr>`;
+        }
+
+        observeAllQuoteNodes();
+      } catch (e) {
+        console.error('ETF Hub error:', e);
+      }
+    }
+
+    // =========================================================================
+    // View 4: Portfolio Asset Calculator, Positions, Watchlist & Smart Alerts
+    // =========================================================================
+    async function loadPortfolio() {
+      try {
+        const res = await fetch('/api/portfolio');
+        const data = await res.json();
+        renderPortfolioView(data);
+      } catch (e) {
+        console.error('Portfolio load error:', e);
+      }
+    }
+
+    function renderPortfolioView(data) {
+      const s = data.asset_summary;
+      document.getElementById('portTotalEquity').textContent = `NT$ ${Number(s.total_equity_twd).toLocaleString()}`;
+      document.getElementById('portAllocationSub').textContent = `持倉佔比 ${s.invested_weight_pct}% | 現金佔比 ${s.cash_weight_pct}% (${s.position_count} 檔部位)`;
+      document.getElementById('portMarketVal').textContent = `NT$ ${Number(s.gross_market_value_twd).toLocaleString()}`;
+      document.getElementById('portCostSub').textContent = `含買進手續費總成本 NT$ ${Number(s.total_invested_cost_twd).toLocaleString()}`;
+
+      const pnlEl = document.getElementById('portNetPnl');
+      const isPos = s.total_net_unrealized_pnl_twd >= 0;
+      pnlEl.textContent = `${isPos ? '+' : ''}NT$ ${Number(s.total_net_unrealized_pnl_twd).toLocaleString()}`;
+      pnlEl.className = `kpi-value num ${isPos ? 'text-up' : 'text-down'}`;
+
+      const pnlPctEl = document.getElementById('portNetPnlPct');
+      pnlPctEl.textContent = `扣除手續費與證交稅後淨報酬率 ${isPos ? '+' : ''}${s.total_net_unrealized_pnl_pct}%`;
+
+      document.getElementById('portCashInput').value = s.cash_twd;
+
+      // Render Smart Alerts (Target Price Reached + Stop Warning + K-Line Pattern Transition)
+      const alerts = data.alerts || [];
+      const navBadge = document.getElementById('navAlertBadge');
+      const totalBadge = document.getElementById('alertTotalBadge');
+      totalBadge.textContent = `${alerts.length} 則主動提醒`;
+      if (alerts.length > 0) {
+        navBadge.style.display = 'inline-flex';
+        navBadge.textContent = alerts.length;
+      } else {
+        navBadge.style.display = 'none';
+      }
+
+      const alertBox = document.getElementById('smartAlertsContainer');
+      if (alerts.length === 0) {
+        alertBox.innerHTML = `<div style="color:var(--text-muted); font-size:13px;">目前所有持倉與自選股均處於安全區間，無觸發目標價或型態轉弱警示。</div>`;
+      } else {
+        alertBox.innerHTML = alerts.map((a) => {
+          const typeLabel = a.alert_type === 'TARGET_PRICE_REACHED' ? '到達策略目標價提醒' :
+                            (a.alert_type === 'STOP_LOSS_WARNING' ? '停損防線警示' :
+                            (a.alert_type === 'KLINE_PATTERN_TRANSITION' ? 'K 線型態轉變提醒' : '自選股買點提醒'));
+          const bCls = a.severity === 'HIGH' ? 'badge-up' : 'badge-blue';
+          return `
+            <div class="alert-item ${a.severity === 'HIGH' ? 'high' : 'medium'}">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                  <span class="badge ${bCls}">${typeLabel}</span>
+                  <strong style="font-size:13px;">${a.title}</strong>
+                </div>
+                <div style="font-size:12px; color:var(--text-secondary);">${a.message}</div>
+              </div>
+              <div style="text-align:right; flex-shrink:0;">
+                <div class="num" style="font-size:12px; font-weight:700;">現價 ${a.current_price} / 觸發位 ${a.trigger_level}</div>
+                <button class="btn btn-ghost btn-xs" style="margin-top:4px;" onclick="jumpToDiagnosis('${a.symbol}')">查看 K 線</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Render Positions Table
+      const posBody = document.getElementById('positionsTableBody');
+      posBody.innerHTML = (data.positions || []).map((p) => {
+        const isGain = p.net_unrealized_pnl >= 0;
+        const kCls = p.kline_bias === 'BULLISH' ? 'badge-up' : (p.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
+        return `
+          <tr data-quote-symbol="${p.symbol}">
+            <td>
+              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="jumpToDiagnosis('${p.symbol}')">${p.symbol} ${p.name}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${p.sector}</div>
+            </td>
+            <td class="num">${p.shares.toLocaleString()} 股</td>
+            <td class="num">${p.avg_cost_price}</td>
+            <td class="num" style="font-weight:700;" data-quote-price="${p.symbol}">${p.current_price}</td>
+            <td class="num ${isGain ? 'text-up' : 'text-down'}">
+              <div style="font-weight:700;">${isGain ? '+' : ''}${p.net_unrealized_pnl.toLocaleString()} 元 (${isGain ? '+' : ''}${p.net_unrealized_pnl_pct}%)</div>
+              <div style="font-size:11px; color:var(--text-muted);">預估稅費 ${p.est_fee_and_tax.toLocaleString()} 元</div>
+            </td>
+            <td class="num">
+              <div style="font-weight:700;" class="text-up">${p.effective_target_price}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${p.dist_to_target_pct <= 0 ? '已達標' : `距目標 +${p.dist_to_target_pct}%`}</div>
+            </td>
+            <td class="num">
+              <div style="font-weight:700;" class="text-down">${p.effective_stop_price} ${p.break_even_active ? '(保本鎖利)' : ''}</div>
+              <div style="font-size:11px; color:var(--text-muted);">緩衝 ${p.dist_to_stop_pct}%</div>
+            </td>
+            <td><span class="badge ${kCls}">${p.kline_pattern}</span></td>
+            <td><span class="badge badge-blue">${p.action_label}</span></td>
+            <td>
+              <button class="btn btn-ghost btn-xs" onclick="removePosition('${p.symbol}')">移除</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Render Watchlist Table
+      const wBody = document.getElementById('watchlistTableBody');
+      wBody.innerHTML = (data.watchlist || []).map((w) => {
+        const isUp = w.change_pct >= 0;
+        const kCls = w.kline_bias === 'BULLISH' ? 'badge-up' : (w.kline_bias === 'BEARISH' ? 'badge-down' : 'badge-neutral');
+        return `
+          <tr data-quote-symbol="${w.symbol}">
+            <td>
+              <div class="num" style="font-weight:700; cursor:pointer; color:var(--brand-blue);" onclick="jumpToDiagnosis('${w.symbol}')">${w.symbol} ${w.name}</div>
+            </td>
+            <td><span class="badge badge-neutral">${w.sector}</span></td>
+            <td class="num" style="font-weight:700;" data-quote-price="${w.symbol}">${w.price}</td>
+            <td class="num ${isUp ? 'text-up' : 'text-down'}" data-quote-chg="${w.symbol}">${isUp ? '+' : ''}${w.change_pct}%</td>
+            <td class="num">
+              ${w.target_buy_price ? `<strong>${w.target_buy_price}</strong> ${w.in_buy_zone ? '<span class="badge badge-up">進入買區</span>' : ''}` : '--'}
+            </td>
+            <td class="num">${w.entry_zone}</td>
+            <td class="num"><span class="text-down">${w.stop_loss}</span> / <span class="text-up">${w.consensus_target}</span></td>
+            <td><span class="badge ${kCls}">${w.kline_pattern}</span></td>
+            <td class="num" style="font-weight:700;">${w.risk_reward}x</td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button class="btn btn-ghost btn-xs" onclick="quickOpenPositionModal('${w.symbol}', '${w.name}', ${w.price})">轉持倉</button>
+                <button class="btn btn-ghost btn-xs" onclick="removeWatchlist('${w.symbol}')">刪除</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      observeAllQuoteNodes();
+    }
+
+    async function postPortfolioAction(payload) {
+      const res = await fetch('/api/portfolio/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      renderPortfolioView(data);
+    }
+
+    function saveCashBalance() {
+      const cash = parseFloat(document.getElementById('portCashInput').value) || 0;
+      postPortfolioAction({ action: 'update_cash', cash_twd: cash });
+    }
+
+    function submitUpsertPosition() {
+      const sym = document.getElementById('posSymInput').value.trim().toUpperCase();
+      const shares = parseInt(document.getElementById('posSharesInput').value, 10) || 1000;
+      const cost = parseFloat(document.getElementById('posCostInput').value);
+      const target = parseFloat(document.getElementById('posTargetInput').value) || null;
+      const stop = parseFloat(document.getElementById('posStopInput').value) || null;
+      if (!sym || !cost) return;
+
+      postPortfolioAction({
+        action: 'upsert_position',
+        symbol: sym,
+        shares,
+        avg_cost_price: cost,
+        custom_target_price: target,
+        custom_stop_price: stop,
+      });
+      document.getElementById('posSymInput').value = '';
+      document.getElementById('posCostInput').value = '';
+      document.getElementById('posTargetInput').value = '';
+      document.getElementById('posStopInput').value = '';
+    }
+
+    function removePosition(symbol) {
+      postPortfolioAction({ action: 'remove_position', symbol });
+    }
+
+    function submitAddWatchlist() {
+      const sym = document.getElementById('watchSymInput').value.trim().toUpperCase();
+      const target = parseFloat(document.getElementById('watchTargetInput').value) || null;
+      if (!sym) return;
+      postPortfolioAction({ action: 'add_watchlist', symbol: sym, target_buy_price: target });
+      document.getElementById('watchSymInput').value = '';
+      document.getElementById('watchTargetInput').value = '';
+    }
+
+    function removeWatchlist(symbol) {
+      postPortfolioAction({ action: 'remove_watchlist', symbol });
+    }
+
+    function quickAddWatchlist(symbol, name, price) {
+      postPortfolioAction({
+        action: 'add_watchlist',
+        symbol,
+        name,
+        target_buy_price: Math.round(price * 0.985 * 10) / 10,
+      });
+      switchTab('portfolio');
+    }
+
+    function quickOpenPositionModal(symbol, name, price) {
+      switchTab('portfolio');
+      document.getElementById('posSymInput').value = symbol;
+      document.getElementById('posCostInput').value = price;
+      document.getElementById('posTargetInput').value = Math.round(price * 1.15 * 10) / 10;
+      document.getElementById('posStopInput').value = Math.round(price * 0.93 * 10) / 10;
+      document.getElementById('posSymInput').focus();
+    }
+
+    function quickAddWatchlistFromDiag() {
+      quickAddWatchlist(state.currentDiagSymbol, state.currentDiagName, state.currentDiagPrice);
+    }
+
+    function quickAddPositionFromDiag() {
+      quickOpenPositionModal(state.currentDiagSymbol, state.currentDiagName, state.currentDiagPrice);
+    }
+
+    function applyUserSettings() {
+      state.atrPeriod = parseInt(document.getElementById('cfgAtrPeriod').value, 10) || 14;
+      state.atrMultiplier = parseFloat(document.getElementById('cfgAtrMult').value) || 2.5;
+      state.basePositionPct = parseFloat(document.getElementById('cfgBasePosPct').value) || 15.0;
+      state.minFScore = parseInt(document.getElementById('cfgMinFScore').value, 10) || 6;
+      state.feeDiscount = parseFloat(document.getElementById('cfgFeeDiscount').value) || 0.60;
+
+      postPortfolioAction({ action: 'update_cash', fee_discount: state.feeDiscount });
+      updatePollingInterval();
+      switchTab('screener');
+    }
+
+    // =========================================================================
+    // Initialize App on Load
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', async () => {
+      initViewportObserver();
+      await loadOverview();
+      await loadScreener();
+      await loadPortfolio();
+      updatePollingInterval();
+    });
+  </script>
+</body>
+</html>

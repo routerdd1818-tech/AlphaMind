@@ -1,0 +1,16 @@
+# Environment & Secret Configs
+.env
+.env.*
+!.env.example
+config.ini
+user_portfolio_state.json
+*.p12
+!config.example.ini
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS
+.DS_Store
