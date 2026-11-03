@@ -176,7 +176,7 @@ class NeutralAIAgent:
                 f"{'保本防護已生效，保本停損點鎖在 ' + str(allocated.break_even_stop_price) + '；' if allocated.break_even_protection_active else '處於成本盤整期，未達保本門檻；'}"
                 f"當前有效移動停損為 {allocated.effective_trailing_stop_price:.1f}。"
                 f"階梯停利：Tier 1 (+15%) 為 {allocated.tiered_take_profit_ladder['tier_1_take_profit_33pct']:.1f}，Tier 2 (+25%) 為 {allocated.tiered_take_profit_ladder['tier_2_take_profit_33pct']:.1f}。"
-                f"目前系統推薦操作：【{allocated.action_recommendation}】（{allocated.action_rationale}）。"
+                f"目前系統推薦操作：【{getattr(allocated, 'action_recommendation_zh', allocated.action_recommendation)}】（{allocated.action_rationale}）。"
             )
         else:
             alloc_plan = "目前未設定特定持股均價，建議依現價預測之掛單與停損區間建立首筆部位。"

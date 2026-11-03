@@ -832,7 +832,7 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 
         risk_engine = DynamicStopLossEngine(atr_multiplier=atr_mult)
 
-        # 1. 現價預測 (納入 K 線型態修正因子與頸線支撐)
+        # 1. 現價預測 (融合 Connors 均值回歸 + Minervini VCP + 吊燈風控)
         unalloc = risk_engine.predict_unallocated_targets_and_stops(
             symbol=raw_sym,
             current_price=current_price,
@@ -843,6 +843,7 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             support_level=current_price * 0.98,
             pattern_target_modifier=pattern_report.target_price_modifier,
             pattern_support_stop=pattern_report.pattern_neckline_support,
+            bars=bars,
         )
 
         # 2. 持倉策略 (以實際買進均價為基準)
@@ -869,6 +870,11 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
                 "pattern_neckline": pattern_report.pattern_neckline_support,
                 "risk_reward_ratio": unalloc.risk_reward_ratio,
                 "is_favorable": unalloc.is_favorable_entry,
+                "strategy_mode": unalloc.strategy_mode,
+                "strategy_mode_zh": unalloc.strategy_mode_zh,
+                "composite_win_rate_pct": unalloc.composite_win_rate_pct,
+                "strategy_sources": unalloc.strategy_sources,
+                "strategy_details_zh": unalloc.strategy_details_zh,
             },
             "allocated": {
                 "avg_cost": alloc.avg_cost_price,
@@ -880,7 +886,10 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
                 "tier_1_target": alloc.tiered_take_profit_ladder["tier_1_take_profit_33pct"],
                 "tier_2_target": alloc.tiered_take_profit_ladder["tier_2_take_profit_33pct"],
                 "recommendation": alloc.action_recommendation,
+                "recommendation_zh": alloc.action_recommendation_zh,
                 "rationale": alloc.action_rationale,
+                "composite_win_rate_pct": alloc.composite_win_rate_pct,
+                "strategy_sources": alloc.strategy_sources,
             },
         })
 
