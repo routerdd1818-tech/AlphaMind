@@ -13,6 +13,24 @@ services:
         value: "1"
       - key: KEEP_ALIVE_INTERVAL_SEC
         value: "600"
+      - key: TWSE_OPENAPI_STOCK_DAY_ALL
+        value: "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+      - key: TWSE_OPENAPI_BWIBBU_ALL
+        value: "https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"
+      - key: TPEX_OPENAPI_DAILY_CLOSE
+        value: "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+      - key: TPEX_OPENAPI_PERATIO
+        value: "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis"
+      - key: TWSE_MIS_QUOTE_URL
+        value: "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+      - key: TWSE_ETF_ANAV_URL
+        value: "https://mis.twse.com.tw/stock/data/all_etf.txt"
+      - key: YAHOO_FINANCE_CHART_URL
+        value: "https://query1.finance.yahoo.com/v8/finance/chart"
+      - key: EXCHANGE_RATE_API_URL
+        value: "https://open.er-api.com/v6/latest/USD"
+      - key: FRED_CSV_GRAPH_URL
+        value: "https://fred.stlouisfed.org/graph/fredgraph.csv"
       - key: FUGLE_API_KEY
         sync: false
       - key: FUGLE_API_SECRET

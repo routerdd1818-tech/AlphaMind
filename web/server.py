@@ -470,15 +470,23 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             "EU": {"policy_rate": 3.25, "yield_10y": 2.30, "vix": 17.2, "fx_eur": 1.088},
         }
 
+        twse_url = load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") or "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+        tpex_url = load_env_variable("TPEX_OPENAPI_DAILY_CLOSE") or "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+        mis_url = load_env_variable("TWSE_MIS_QUOTE_URL") or "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+        anav_url = load_env_variable("TWSE_ETF_ANAV_URL") or "https://mis.twse.com.tw/stock/data/all_etf.txt"
+        yf_url = load_env_variable("YAHOO_FINANCE_CHART_URL") or "https://query1.finance.yahoo.com/v8/finance/chart"
+        fx_url = load_env_variable("EXCHANGE_RATE_API_URL") or "https://open.er-api.com/v6/latest/USD"
+        fred_url = load_env_variable("FRED_CSV_GRAPH_URL") or "https://fred.stlouisfed.org/graph/fredgraph.csv"
+
         api_registry = {
             "fugle_realtime": bool(FUGLE_ADAPTER.is_configured),
             "finmind_token": bool(FinMindConfig().token),
             "gemini_ai": bool(load_env_variable("GEMINI_API_KEY")),
             "supabase_cloud": bool(load_env_variable("SUPABASE_URL") and load_env_variable("SUPABASE_ANON_KEY")),
-            "twse_tpex_openapi": bool(load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") and load_env_variable("TPEX_OPENAPI_DAILY_CLOSE")),
-            "twse_mis_etf_nav": bool(load_env_variable("TWSE_MIS_QUOTE_URL") and load_env_variable("TWSE_ETF_ANAV_URL")),
-            "yahoo_finance_v8": bool(load_env_variable("YAHOO_FINANCE_CHART_URL")),
-            "macro_fx_fred": bool(load_env_variable("EXCHANGE_RATE_API_URL") and load_env_variable("FRED_CSV_GRAPH_URL")),
+            "twse_tpex_openapi": bool(twse_url and tpex_url),
+            "twse_mis_etf_nav": bool(mis_url and anav_url),
+            "yahoo_finance_v8": bool(yf_url),
+            "macro_fx_fred": bool(fx_url and fred_url),
         }
 
         self._send_json({

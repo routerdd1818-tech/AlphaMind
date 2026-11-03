@@ -2397,12 +2397,16 @@
             yahoo_finance_v8: 'Yahoo Finance v8 備援',
             macro_fx_fred: '6 國匯率與 FRED 殖利率',
           };
+          const publicKeys = ['twse_tpex_openapi', 'twse_mis_etf_nav', 'yahoo_finance_v8', 'macro_fx_fred'];
           apiGrid.innerHTML = Object.entries(labels).map(([k, name]) => {
             const ok = data.api_registry[k];
+            const isPublic = publicKeys.includes(k);
+            let badgeText = ok ? (isPublic ? '免密已連線' : '已連線') : '未設定';
+            let badgeClass = ok ? 'badge-down' : 'badge-warn';
             return `
               <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border:1px solid var(--border-color); border-radius:8px; font-size:12px;">
                 <span style="font-weight:600;">${name}</span>
-                <span class="badge ${ok ? 'badge-down' : 'badge-warn'}">${ok ? '已連線' : '未設定'}</span>
+                <span class="badge ${badgeClass}">${badgeText}</span>
               </div>
             `;
           }).join('');
