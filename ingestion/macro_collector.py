@@ -5,7 +5,11 @@ for the 6 regions: US, TW, JP, KR, HK, EU.
 """
 
 from datetime import datetime
-from typing import Dict, Optional
+import json
+import time
+import urllib.request
+from typing import Any, Dict, Optional
+from alphamind.ingestion.finmind_collector import load_env_variable
 from alphamind.engine.macro_engine import (
     MacroRegion,
     RateHikeExpectation,
@@ -14,7 +18,37 @@ from alphamind.engine.macro_engine import (
 
 
 class GlobalMacroCollector:
-    """全球總經與市場情緒資料收集器"""
+    """全球總經與市場情緒資料收集器（整合 ExchangeRate-API 與 FRED 殖利率端點）"""
+
+    _fx_cache: Dict[str, float] = {}
+    _fx_cache_ts: float = 0.0
+
+    @classmethod
+    def fetch_live_fx_rates(cls) -> Dict[str, float]:
+        """從 EXCHANGE_RATE_API_URL (open.er-api.com) 抓取最新 USD 兌 TWD/JPY/KRW/HKD/EUR 匯率 (30 分鐘快取)"""
+        now = time.time()
+        if cls._fx_cache and (now - cls._fx_cache_ts) < 1800:
+            return cls._fx_cache
+
+        api_url = load_env_variable("EXCHANGE_RATE_API_URL") or "https://open.er-api.com/v6/latest/USD"
+        try:
+            req = urllib.request.Request(api_url, headers={"User-Agent": "AlphaMind-Macro/2.0"})
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                rates = payload.get("rates", {})
+                if rates:
+                    cls._fx_cache = {
+                        "TWD": float(rates.get("TWD", 32.15)),
+                        "JPY": float(rates.get("JPY", 153.20)),
+                        "KRW": float(rates.get("KRW", 1375.0)),
+                        "HKD": float(rates.get("HKD", 7.77)),
+                        "EUR": round(1.0 / float(rates.get("EUR", 0.919)), 4) if rates.get("EUR") else 1.088,
+                    }
+                    cls._fx_cache_ts = now
+                    return cls._fx_cache
+        except Exception:
+            pass
+        return {"TWD": 32.15, "JPY": 153.20, "KRW": 1375.0, "HKD": 7.77, "EUR": 1.088}
 
     @staticmethod
     def get_latest_snapshot(

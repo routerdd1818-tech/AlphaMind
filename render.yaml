@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: alphamind-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python web/server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FUGLE_API_KEY
+        sync: false
+      - key: FUGLE_API_SECRET
+        sync: false
+      - key: FINMIND_API_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

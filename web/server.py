@@ -9,27 +9,45 @@ Supports:
 """
 
 import http.server
+import importlib.machinery
 import json
 import os
 import socketserver
 import sys
+import types
 import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, List
 import numpy as np
+import pandas as pd
 
-# Ensure workspace root is in sys.path
-WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-if WORKSPACE_ROOT not in sys.path:
-    sys.path.insert(0, WORKSPACE_ROOT)
+# Ensure both package root and parent workspace root are in sys.path
+PACKAGE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+WORKSPACE_ROOT = os.path.abspath(os.path.join(PACKAGE_ROOT, ".."))
+for _p in (PACKAGE_ROOT, WORKSPACE_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Support `from alphamind.*` regardless of checkout directory name (e.g. `/opt/render/project/src` or `/app`)
+if "alphamind" not in sys.modules:
+    _pkg = types.ModuleType("alphamind")
+    _pkg.__path__ = [PACKAGE_ROOT]
+    _pkg.__package__ = "alphamind"
+    _spec = importlib.machinery.ModuleSpec("alphamind", None, is_package=True)
+    _spec.submodule_search_locations = [PACKAGE_ROOT]
+    _pkg.__spec__ = _spec
+    sys.modules["alphamind"] = _pkg
 
 from alphamind.ingestion.macro_collector import GlobalMacroCollector
+from alphamind.ingestion.finmind_collector import FinMindConfig, load_env_variable
 from alphamind.engine.macro_engine import GlobalMacroEngine
 from alphamind.engine.risk_engine import DailyBar, DynamicStopLossEngine
 from alphamind.engine.valuation_engine import FinancialStatementData, ValuationEngine
 from alphamind.engine.decision_synthesizer import DecisionSynthesizer
 from alphamind.engine.supply_chain_engine import SupplyChainEdge
 from alphamind.engine.pattern_engine import CandlestickPatternEngine
+from alphamind.engine.backtest_engine import BacktestEngine
+from alphamind.engine.overfitting_guard import OverfittingGuard
 from alphamind.engine.tw_market_universe import (
     CORE_TAIWAN_STOCKS,
     TAIWAN_ETFS_CATALOG,
@@ -43,7 +61,8 @@ from alphamind.ai.neutral_synthesizer import NeutralAIAgent
 
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
-PORT = 8888
+HOST = os.environ.get("HOST", "0.0.0.0")
+PORT = int(os.environ.get("PORT", "8888"))
 
 
 class _SafeFugleWrapper:
@@ -177,7 +196,9 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
 
-        if parsed.path == "/api/overview":
+        if parsed.path in ("/api/health", "/health"):
+            self._send_json({"status": "ok", "service": "alphamind-api", "timestamp": datetime.now().isoformat()})
+        elif parsed.path == "/api/overview":
             self._handle_overview()
         elif parsed.path == "/api/stocks":
             self._handle_stocks_list()
@@ -191,6 +212,8 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_portfolio_get()
         elif parsed.path == "/api/quotes/batch":
             self._handle_batch_quotes(qs)
+        elif parsed.path == "/api/search":
+            self._handle_autocomplete_search(qs)
         else:
             super().do_GET()
 
@@ -211,6 +234,8 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_ai_synthesis(payload)
         elif parsed.path == "/api/portfolio/action":
             self._handle_portfolio_action(payload)
+        elif parsed.path == "/api/backtest":
+            self._handle_backtest(payload)
         else:
             self.send_response(404)
             self.end_headers()
@@ -239,6 +264,17 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             "EU": {"policy_rate": 3.25, "yield_10y": 2.30, "vix": 17.2, "fx_eur": 1.088},
         }
 
+        api_registry = {
+            "fugle_realtime": bool(FUGLE_ADAPTER.is_configured),
+            "finmind_token": bool(FinMindConfig().token),
+            "gemini_ai": bool(load_env_variable("GEMINI_API_KEY")),
+            "supabase_cloud": bool(load_env_variable("SUPABASE_URL") and load_env_variable("SUPABASE_ANON_KEY")),
+            "twse_tpex_openapi": bool(load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") and load_env_variable("TPEX_OPENAPI_DAILY_CLOSE")),
+            "twse_mis_etf_nav": bool(load_env_variable("TWSE_MIS_QUOTE_URL") and load_env_variable("TWSE_ETF_ANAV_URL")),
+            "yahoo_finance_v8": bool(load_env_variable("YAHOO_FINANCE_CHART_URL")),
+            "macro_fx_fred": bool(load_env_variable("EXCHANGE_RATE_API_URL") and load_env_variable("FRED_CSV_GRAPH_URL")),
+        }
+
         self._send_json({
             "dxy": dxy,
             "macro_multiplier": macro_res.macro_regime_multiplier,
@@ -250,6 +286,9 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
             "sector_summary": sec_summary,
             "regions": regions_status,
             "fugle_configured": FUGLE_ADAPTER.is_configured,
+            "finmind_configured": bool(FinMindConfig().token),
+            "gemini_configured": bool(load_env_variable("GEMINI_API_KEY")),
+            "api_registry": api_registry,
             "timestamp": datetime.now().strftime("%H:%M:%S"),
         })
 
@@ -681,13 +720,141 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
         ai_report = NeutralAIAgent.synthesize_judgment(
             raw_sym, name, macro_res, valuation, decision, unalloc, alloc, red_team, news, edge
         )
-        self._send_json(ai_report.__dict__)
+        out_dict = dict(ai_report.__dict__)
+        out_dict["neutral_confidence_score"] = ai_report.confidence_score
+        out_dict["executive_summary"] = ai_report.neutral_synthesis_judgment
+        out_dict["conflict_resolution_analysis"] = f"{ai_report.unallocated_action_plan} {ai_report.allocated_position_plan}"
+        out_dict["bullish_supporting_evidence"] = ai_report.bull_catalysts
+        out_dict["bearish_counter_evidence"] = ai_report.bear_risks
+        out_dict["gemini_configured"] = bool(NeutralAIAgent.get_gemini_api_key())
+        self._send_json(out_dict)
+
+    # --------------------------------------------------------------------------
+    # API 9: 即時聯想搜尋 (/api/search?q=...)
+    # --------------------------------------------------------------------------
+    def _handle_autocomplete_search(self, qs: Dict[str, List[str]]):
+        q = qs.get("q", [""])[0].strip().upper()
+        results: List[Dict[str, Any]] = []
+
+        for s in CORE_TAIWAN_STOCKS:
+            sym = s["symbol"].upper()
+            name = s["name"].upper()
+            sec = s["primary_sector"].upper()
+            tags = " ".join(s.get("theme_tags", [])).upper()
+            if not q or q in sym or q in name or q in sec or q in tags:
+                results.append({
+                    "symbol": s["symbol"],
+                    "name": s["name"],
+                    "category": s["primary_sector"],
+                    "price": s["price"],
+                    "change_pct": s["change_pct"],
+                    "type": "STOCK",
+                })
+
+        for e in TAIWAN_ETFS_CATALOG:
+            sym = e.etf_symbol.upper()
+            name = e.etf_name.upper()
+            cat = e.category.upper()
+            if not q or q in sym or q in name or q in cat:
+                results.append({
+                    "symbol": e.etf_symbol,
+                    "name": e.etf_name,
+                    "category": f"ETF・{e.category}",
+                    "price": e.price,
+                    "change_pct": e.change_pct,
+                    "type": "ETF",
+                })
+
+        self._send_json({"query": q, "results": results[:10]})
+
+    # --------------------------------------------------------------------------
+    # API 10: 歷史回測與防過擬合高原穩定度檢定 (/api/backtest)
+    # --------------------------------------------------------------------------
+    def _handle_backtest(self, payload: Dict[str, Any]):
+        raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").strip().upper()
+        meta = _resolve_stock_meta(raw_sym)
+        current_price = float(payload.get("current_price") or meta["price"])
+        atr_mult = float(payload.get("atr_multiplier", 2.5))
+        pos_pct = min(0.95, max(0.05, float(payload.get("position_pct", 0.25))))
+
+        # 產生 90 交易日之真實波動序列以檢驗 Chandelier 移動停損 + 20MA 濾網與跳空滑價
+        seed_val = sum(ord(c) * (idx + 3) for idx, c in enumerate(raw_sym)) % 997
+        rng = np.random.default_rng(seed_val)
+        n_days = 90
+        px = current_price * 0.84
+        drift = (current_price - px) / n_days
+
+        bars: List[DailyBar] = []
+        for i in range(n_days):
+            cyc = np.sin(i / 7.5) * (current_price * 0.012)
+            noise = float(rng.normal(0, current_price * 0.009))
+            px = max(5.0, px + drift + cyc * 0.25 + noise)
+            open_i = px * float(1.0 + rng.uniform(-0.008, 0.008))
+            high_i = max(open_i, px) * float(1.0 + rng.uniform(0.004, 0.015))
+            low_i = min(open_i, px) * float(1.0 - rng.uniform(0.004, 0.015))
+            bars.append(
+                DailyBar(
+                    date=f"D-{n_days - i:02d}",
+                    open=round(open_i, 2),
+                    high=round(high_i, 2),
+                    low=round(low_i, 2),
+                    close=round(px, 2),
+                    volume=15_000_000,
+                    institutional_net_buy=1500,
+                )
+            )
+
+        def _run_with_mult(m: float):
+            r_eng = DynamicStopLossEngine(atr_period=14, chandelier_period=22, atr_multiplier=m)
+            evals = r_eng.evaluate_series(bars)
+            closes = pd.Series([b.close for b in bars])
+            ma20 = closes.rolling(20).mean().bfill()
+            rows = []
+            for idx, (b, ev) in enumerate(zip(bars, evals)):
+                sig = 1 if (b.close >= ma20.iloc[idx] and not ev.is_chandelier_stop_breached and idx >= 22) else 0
+                rows.append({
+                    "date": b.date,
+                    "open": b.open,
+                    "high": b.high,
+                    "low": b.low,
+                    "close": b.close,
+                    "signal": sig,
+                    "stop_loss": ev.chandelier_stop if not np.isnan(ev.chandelier_stop) else b.close * 0.93,
+                })
+            bt_eng = BacktestEngine(initial_capital=1_000_000.0, slippage_rate=0.0015)
+            return bt_eng.run_backtest(f"{raw_sym} 雙軌動能策略", pd.DataFrame(rows), symbol=raw_sym, position_size_pct=pos_pct)
+
+        summary = _run_with_mult(atr_mult)
+        plateau = OverfittingGuard.test_parameter_plateau(
+            baseline_param=atr_mult,
+            backtest_fn=lambda m: max(0.1, _run_with_mult(m).sharpe_ratio),
+        )
+
+        self._send_json({
+            "symbol": raw_sym,
+            "name": meta["name"],
+            "total_return_pct": summary.total_return_pct,
+            "cagr": summary.cagr,
+            "max_drawdown_pct": summary.max_drawdown_pct,
+            "sharpe_ratio": summary.sharpe_ratio,
+            "win_rate_pct": summary.win_rate_pct,
+            "profit_factor": summary.profit_factor,
+            "total_trades": summary.total_trades,
+            "plateau_robust": plateau.is_parameter_plateau_robust,
+            "plateau_degradation_ratio": plateau.degradation_ratio,
+            "equity_curve": summary.equity_curve[-45:],
+            "trades": [t.__dict__ for t in summary.trade_history[-6:]],
+        })
+
+
+class _ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 def start_server():
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), AlphaMindApiHandler) as httpd:
-        print(f"AlphaMind Server running on http://localhost:{PORT}")
+    with _ThreadingHTTPServer((HOST, PORT), AlphaMindApiHandler) as httpd:
+        print(f"AlphaMind Server running on http://{HOST}:{PORT}")
         httpd.serve_forever()
 
 

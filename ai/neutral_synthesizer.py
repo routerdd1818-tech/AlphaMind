@@ -7,7 +7,10 @@ unbiased, and objective investment judgment.
 
 from datetime import datetime
 import json
+import os
+import urllib.request
 from typing import Dict, List, Optional
+from alphamind.ingestion.finmind_collector import load_env_variable
 from alphamind.ai.schemas import (
     DevilsAdvocateReport,
     NeutralAIAnalysisReport,
@@ -38,7 +41,11 @@ NEUTRAL_CIO_SYSTEM_PROMPT = """
 
 
 class NeutralAIAgent:
-    """中性 AI 決策綜合研判代理"""
+    """中性 AI 決策綜合研判代理（自動載入 GEMINI_API_KEY）"""
+
+    @staticmethod
+    def get_gemini_api_key() -> str:
+        return load_env_variable("GEMINI_API_KEY")
 
     @classmethod
     def synthesize_judgment(

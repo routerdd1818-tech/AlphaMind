@@ -70,11 +70,33 @@ python run.py
 3. 複製貼上 [schema/supabase_alphamind_schema.sql](schema/supabase_alphamind_schema.sql) 的全部內容並點擊 **Run**。
 4. 完成：已自動建立原生時序分區、`get_supply_chain_network` 遞迴圖譜遍歷函數、`pgvector` 支援及初始種子資料。
 
-### 2. Vercel 前端一鍵部署
-1. 將專案推至 GitHub Repository。
-2. 登入 [Vercel](https://vercel.com/) 點擊 **Add New Project**。
-3. **Root Directory** 設定填入：`alphamind/web`。
-4. 點擊 **Deploy**，30 秒內即可獲得線上正式公開網址。
+### 2. 後端 Python API 雲端部署（Railway / Render / Fly.io）
+專案根目錄已內建 `Procfile`、`railway.json`、`render.yaml`、`Dockerfile` 與 `fly.toml`，支援一鍵雲端部署：
+
+- **Railway / Render 部署步驟**：
+  1. 將專案推送至 GitHub（`https://github.com/routerdd1818-tech/AlphaMind.git`）。
+  2. 登入 **Railway** 或 **Render** $\rightarrow$ 新增 **Web Service** 並連結 GitHub 儲存庫。
+  3. 平台會自動讀取 `railway.json` 或 `render.yaml`（Build 指令：`pip install -r requirements.txt`；Start 指令：`python web/server.py`；Healthcheck：`/api/health`）。
+  4. 於平台 **Variables / Environment** 填入：
+     - `FUGLE_API_KEY`
+     - `FUGLE_API_SECRET`
+     - `FINMIND_API_TOKEN`
+     - `GEMINI_API_KEY`
+  5. 部署完成後，**直接開啟該雲端網址即可同時使用戰情室前端與 Python API**（同網域免設定）。
+
+- **Fly.io 部署步驟**：
+  ```bash
+  fly launch --copy-config --no-deploy
+  fly secrets set FUGLE_API_KEY="你的金鑰" FUGLE_API_SECRET="你的密鑰" FINMIND_API_TOKEN="你的Token" GEMINI_API_KEY="你的金鑰"
+  fly deploy
+  ```
+
+### 3. Vercel 前端分離部署與串接
+1. 登入 [Vercel](https://vercel.com/) 點擊 **Add New Project**，選擇 GitHub Repo。
+2. **Root Directory** 設定為 `web`（若從 `AlphaMind` 獨立 Repo 部署）。
+3. 開啟部署後的 Vercel 網址，可透過以下任一方式綁定雲端 Python API：
+   - 直接在網址尾端加上 `?api=https://你的後端網址`（自動寫入瀏覽器記憶）。
+   - 或進入戰情室 **「總經設定」** 分頁 $\rightarrow$ 在 **「雲端 Python API 伺服器網址」** 欄位填入 Railway / Render / Fly.io 網址並點擊「套用參數設定」。
 
 ---
 

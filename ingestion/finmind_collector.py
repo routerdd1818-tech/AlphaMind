@@ -6,16 +6,42 @@ Pulls Taiwan stock OHLCV, institutional trading, margin balance, and financial s
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
+import os
 from typing import Any, Dict, List, Optional
 import urllib.request
 import urllib.parse
 import pandas as pd
 
 
+def load_env_variable(key_name: str) -> str:
+    val = os.getenv(key_name, "")
+    if val:
+        return val
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("../.env", ".env", "../../.env"):
+        p = os.path.join(base_dir, rel)
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    if k.strip() == key_name:
+                        return v.strip().strip("'\"")
+    return ""
+
+
 @dataclass
 class FinMindConfig:
     token: Optional[str] = None
     timeout: int = 15
+
+    def __post_init__(self) -> None:
+        if not self.token:
+            loaded = load_env_variable("FINMIND_API_TOKEN")
+            if loaded:
+                self.token = loaded
 
 
 class FinMindCollector:

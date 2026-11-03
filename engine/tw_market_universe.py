@@ -9,6 +9,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from alphamind.ingestion.finmind_collector import load_env_variable
 
 
 @dataclass
@@ -894,7 +895,7 @@ class TaiwanMarketUniverseEngine:
             live_vol = base_vol
             source = "CACHED_TICK_STREAM"
 
-            # 若有配置 Fugle Adapter 且額度允許（每次可視批次最多打 3 檔外部 HTTP 以確保極速回應）
+            # 1. 優先嘗試 Fugle 即時報價 API（每次可視批次最多打 3 檔外部 HTTP 保護額度）
             if fugle_adapter is not None and getattr(fugle_adapter, "is_configured", False) and api_fetches < 3:
                 try:
                     q_res = fugle_adapter.fetch_intraday_quote(sym)
@@ -910,8 +911,16 @@ class TaiwanMarketUniverseEngine:
                 except Exception:
                     pass
 
-            # 若盤中無外部成交變動，模擬極微小盤中五檔跳動感 (幅度限制於 +-0.15% 內保持真實度)
-            if source != "FUGLE_LIVE_API":
+            # 2. 若盤後或 Fugle 未回傳，嘗試 Yahoo Finance v8 Chart API 備援
+            if source != "FUGLE_LIVE_API" and api_fetches < 3:
+                yf_res = self._fetch_yahoo_quote(sym)
+                if yf_res:
+                    live_px, live_chg = yf_res
+                    source = "YAHOO_V8_API"
+                    api_fetches += 1
+
+            # 3. 若離線或收盤時段，使用微幅五檔跳動或快取基準
+            if source not in ("FUGLE_LIVE_API", "YAHOO_V8_API"):
                 tick_seed = (int(now // 3) + sum(ord(c) for c in sym)) % 5 - 2
                 tick_step = 0.5 if base_px >= 100 else (0.1 if base_px >= 20 else 0.05)
                 live_px = round(base_px + tick_seed * tick_step, 2)
@@ -939,13 +948,33 @@ class TaiwanMarketUniverseEngine:
             "quotes": quotes_out,
         }
 
+    def _fetch_yahoo_quote(self, symbol: str) -> Optional[Tuple[float, float]]:
+        """向環境變數 YAHOO_FINANCE_CHART_URL 查詢個股或 ETF 最新市價與漲跌幅"""
+        base_url = load_env_variable("YAHOO_FINANCE_CHART_URL") or "https://query1.finance.yahoo.com/v8/finance/chart"
+        yf_sym = f"{symbol}.TW" if not symbol.endswith((".TW", ".TWO")) else symbol
+        url = f"{base_url}/{yf_sym}?interval=1d&range=1d"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 AlphaMind/2.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+                reg_px = meta.get("regularMarketPrice")
+                prev_px = meta.get("chartPreviousClose") or meta.get("previousClose") or reg_px
+                if reg_px:
+                    px = round(float(reg_px), 2)
+                    chg = round((px - float(prev_px)) / float(prev_px) * 100.0, 2) if prev_px else 0.0
+                    return (px, chg)
+        except Exception:
+            pass
+        return None
+
     def _fetch_twse_openapi_stocks(self) -> List[Dict[str, Any]]:
-        """向證交所官方免費無限制 OpenAPI 抓取全市場上市日收盤資訊 (含 10 分鐘快取)"""
+        """向證交所官方免費無限制 OpenAPI 與櫃買中心 OpenAPI 抓取全市場上市櫃日收盤資訊 (含 10 分鐘快取)"""
         now = time.time()
         if self._twse_full_catalog_cache and (now - self._twse_catalog_fetched_at) < 600:
             return self._twse_full_catalog_cache
 
-        url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+        url = load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") or "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
         req = urllib.request.Request(url, headers={"User-Agent": "AlphaMind-Quantitative/2.0"})
         parsed: List[Dict[str, Any]] = []
         try:

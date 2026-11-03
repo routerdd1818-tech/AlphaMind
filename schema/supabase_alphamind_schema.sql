@@ -377,3 +377,38 @@ CREATE TABLE IF NOT EXISTS price_pattern_alerts (
     triggered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ------------------------------------------------------------------------------
+-- 9. AlphaMind Unified Cloud API Vault (儲存所有第三方與公開 API 憑證與端點)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS alphamind_api_configs (
+    config_key VARCHAR(64) PRIMARY KEY,
+    config_value TEXT NOT NULL,
+    category VARCHAR(32) NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO alphamind_api_configs (config_key, config_value, category, description)
+VALUES
+    ('FUGLE_API_KEY', '<YOUR_FUGLE_API_KEY>', 'REALTIME_QUOTE', '富果 Fugle MarketData & Trading API Key'),
+    ('FUGLE_API_SECRET', '<YOUR_FUGLE_API_SECRET>', 'REALTIME_QUOTE', '富果 Fugle API Secret'),
+    ('FUGLE_MARKETDATA_BASE_URL', 'https://api.fugle.tw/marketdata/v1.0/stock', 'REALTIME_QUOTE', '富果盤中即時報價與五檔 REST 端點'),
+    ('FINMIND_API_TOKEN', '<YOUR_FINMIND_API_TOKEN>', 'FUNDAMENTAL_CHIP', 'FinMind 台股歷史K線、法人籌碼與財報 JWT Token'),
+    ('FINMIND_API_URL', 'https://api.finmindtrade.com/api/v4/data', 'FUNDAMENTAL_CHIP', 'FinMind API v4 資料端點'),
+    ('GEMINI_API_KEY', '<YOUR_GEMINI_API_KEY>', 'AI_SYNTHESIS', 'Google Gemini AI 中性投資裁決金鑰'),
+    ('SUPABASE_URL', 'https://xjdwjrmtiutapoeikvln.supabase.co', 'CLOUD_DB', 'Supabase 專案雲端網址'),
+    ('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZHdqcm10aXV0YXBvZWlrdmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MDM0MjYsImV4cCI6MjEwNzI3OTQyNn0.3LoLaoS9UggTQW3x5fdAW0x5Ekiyb0vmQaVasvkb8V0', 'CLOUD_DB', 'Supabase Public Anon Key'),
+    ('TWSE_OPENAPI_STOCK_DAY_ALL', 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL', 'TW_OPENAPI', '證交所上市全市場每日收盤行情 OpenAPI'),
+    ('TWSE_OPENAPI_BWIBBU_ALL', 'https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL', 'TW_OPENAPI', '證交所全市場本益比、殖利率、股價淨值比 OpenAPI'),
+    ('TPEX_OPENAPI_DAILY_CLOSE', 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes', 'TW_OPENAPI', '櫃買中心上櫃全市場收盤行情 OpenAPI'),
+    ('TPEX_OPENAPI_PERATIO', 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis', 'TW_OPENAPI', '櫃買中心上櫃本益比與殖利率 OpenAPI'),
+    ('TWSE_MIS_QUOTE_URL', 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp', 'ETF_AND_MIS', '證交所基本市況 MIS 即時五檔端點'),
+    ('TWSE_ETF_ANAV_URL', 'https://mis.twse.com.tw/stock/data/all_etf.txt', 'ETF_AND_MIS', '全台灣 ETF 即時估計淨值與折溢價端點'),
+    ('YAHOO_FINANCE_CHART_URL', 'https://query1.finance.yahoo.com/v8/finance/chart', 'QUOTE_FALLBACK', 'Yahoo Finance v8 台美股與 ETF 報價備援端點'),
+    ('EXCHANGE_RATE_API_URL', 'https://open.er-api.com/v6/latest/USD', 'MACRO_FX', '全球 6 國即時匯率公開端點'),
+    ('FRED_CSV_GRAPH_URL', 'https://fred.stlouisfed.org/graph/fredgraph.csv', 'MACRO_FX', '美國聖路易聯準會公債殖利率端點')
+ON CONFLICT (config_key) DO UPDATE SET
+    config_value = EXCLUDED.config_value,
+    updated_at = NOW();
+
+
