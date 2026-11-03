@@ -101,36 +101,46 @@ def _resolve_stock_meta(symbol: str) -> Dict[str, Any]:
     return UNIVERSE_ENGINE.get_stock_meta(symbol)
 
 
-def _generate_realistic_bars(symbol: str, current_price: float, kline_bias: str) -> List[DailyBar]:
+def _generate_realistic_bars(symbol: str, current_price: float, kline_bias: str, days: int = 90) -> List[DailyBar]:
     clean = symbol.replace(".TW", "").replace(".TWO", "").strip().upper()
     seed_val = sum(ord(c) * (idx + 1) for idx, c in enumerate(clean)) % 997
     rng = np.random.default_rng(seed_val)
 
     bars: List[DailyBar] = []
-    px = current_price * (0.91 if kline_bias == "BULLISH" else (1.06 if kline_bias == "BEARISH" else 0.98))
-    drift = (current_price - px) / 29.0
+    days = max(60, min(days, 180))
+    px = current_price * (0.86 if kline_bias == "BULLISH" else (1.12 if kline_bias == "BEARISH" else 0.94))
+    drift = (current_price - px) / float(days - 1)
 
-    for i in range(30):
-        noise = float(rng.normal(0, current_price * 0.008))
-        if i == 28:
-            close_i = current_price * (0.982 if kline_bias == "BULLISH" else (1.015 if kline_bias == "BEARISH" else 0.998))
-            open_i = close_i * (1.012 if kline_bias == "BULLISH" else (0.988 if kline_bias == "BEARISH" else 1.002))
-        elif i == 29:
+    from datetime import datetime, timedelta
+    end_date = datetime.now()
+    trading_dates: List[str] = []
+    curr_d = end_date - timedelta(days=int(days * 1.5))
+    while len(trading_dates) < days:
+        if curr_d.weekday() < 5:
+            trading_dates.append(curr_d.strftime("%Y-%m-%d"))
+        curr_d += timedelta(days=1)
+
+    for i in range(days):
+        noise = float(rng.normal(0, current_price * 0.009))
+        if i == days - 2:
+            close_i = current_price * (0.985 if kline_bias == "BULLISH" else (1.012 if kline_bias == "BEARISH" else 0.998))
+            open_i = close_i * (1.010 if kline_bias == "BULLISH" else (0.990 if kline_bias == "BEARISH" else 1.002))
+        elif i == days - 1:
             close_i = current_price
-            open_i = current_price * (0.976 if kline_bias == "BULLISH" else (1.022 if kline_bias == "BEARISH" else 0.996))
+            open_i = current_price * (0.980 if kline_bias == "BULLISH" else (1.018 if kline_bias == "BEARISH" else 0.996))
         else:
             px = max(1.0, px + drift + noise)
             close_i = px
-            open_i = px * float(1.0 + rng.uniform(-0.01, 0.01))
+            open_i = px * float(1.0 + rng.uniform(-0.012, 0.012))
 
-        high_i = max(open_i, close_i) * float(1.0 + rng.uniform(0.004, 0.014))
-        low_i = min(open_i, close_i) * float(1.0 - rng.uniform(0.004, 0.014))
-        vol_i = int(12_000_000 * (1.45 if i == 29 and kline_bias != "NEUTRAL" else rng.uniform(0.75, 1.25)))
+        high_i = max(open_i, close_i) * float(1.0 + rng.uniform(0.004, 0.016))
+        low_i = min(open_i, close_i) * float(1.0 - rng.uniform(0.004, 0.016))
+        vol_i = int(12_000_000 * (1.5 if i == days - 1 and kline_bias != "NEUTRAL" else rng.uniform(0.65, 1.35)))
         inst_i = int(3500 if kline_bias == "BULLISH" else (-2200 if kline_bias == "BEARISH" else 400))
 
         bars.append(
             DailyBar(
-                date=f"2026-10-{i+1:02d}",
+                date=trading_dates[i] if i < len(trading_dates) else f"2026-10-{i+1:02d}",
                 open=round(open_i, 2),
                 high=round(high_i, 2),
                 low=round(low_i, 2),
@@ -226,7 +236,7 @@ def _fetch_real_daily_bars(symbol: str, current_price: float, kline_bias: str = 
 
     # 3. 雙通道皆失敗時之最後容錯合成（避免任何斷線 crash）
     if not bars:
-        bars = _generate_realistic_bars(clean, current_price, kline_bias)
+        bars = _generate_realistic_bars(clean, current_price, kline_bias, days=days)
 
     with _DAILY_BARS_CACHE_LOCK:
         _DAILY_BARS_CACHE[clean] = (now_ts, bars)
@@ -639,7 +649,11 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
     def _handle_stock_analysis(self, payload: Dict[str, Any]):
         raw_sym = str(payload.get("symbol", "2330")).replace(".TW", "").replace(".TWO", "").strip().upper()
         meta = _resolve_stock_meta(raw_sym)
-        current_price = float(payload.get("current_price") or meta["price"])
+        current_price = float(meta["price"])
+        if payload.get("current_price"):
+            p_in = float(payload["current_price"])
+            if abs(p_in - current_price) / max(current_price, 1.0) < 0.15:
+                current_price = p_in
 
         val_engine = ValuationEngine()
         risk_engine = DynamicStopLossEngine(
@@ -651,6 +665,27 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 
         bars = _fetch_real_daily_bars(raw_sym, current_price, meta.get("kline_bias", "NEUTRAL"), days=90)
         if bars:
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            if bars[-1].date == today_str:
+                last_b = bars[-1]
+                bars[-1] = DailyBar(
+                    date=last_b.date,
+                    open=last_b.open,
+                    high=max(last_b.high, current_price),
+                    low=min(last_b.low, current_price),
+                    close=current_price,
+                    volume=last_b.volume,
+                    institutional_net_buy=last_b.institutional_net_buy,
+                )
+            else:
+                bars.append(DailyBar(
+                    date=today_str,
+                    open=round(current_price * 0.995, 2),
+                    high=round(max(current_price, current_price * 1.008), 2),
+                    low=round(min(current_price, current_price * 0.992), 2),
+                    close=current_price,
+                    volume=int(meta.get("volume_lots", 1000) * 1000),
+                ))
             current_price = bars[-1].close
             meta["price"] = current_price
             if len(bars) >= 2:
@@ -1052,7 +1087,25 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
                         "type": "ETF",
                     })
 
-        self._send_json({"query": q, "results": results[:15]})
+        if q:
+            def _match_score(it: Dict[str, Any]) -> int:
+                s = it["symbol"].upper()
+                n = it["name"].upper()
+                if s == q:
+                    return 0
+                if s.startswith(q):
+                    return 1
+                if n.startswith(q):
+                    return 2
+                if q in s:
+                    return 3
+                if q in n:
+                    return 4
+                return 5
+
+            results.sort(key=_match_score)
+
+        self._send_json({"query": q, "results": results[:25]})
 
     # --------------------------------------------------------------------------
     # API 10: 歷史回測與防過擬合高原穩定度檢定 (/api/backtest)

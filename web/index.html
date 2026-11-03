@@ -1517,7 +1517,7 @@
             <div class="card-title">持倉部位損益與策略目標價管理</div>
             <div class="card-subtitle">支援設定購入均價、股數與自訂目標/停損價，並提供「以損定量」最佳買進股數試算</div>
           </div>
-          <button class="btn btn-xs" onclick="openPositionSheet('2330', '台積電', 1050)">+ 新增 / 試算持倉部位</button>
+          <button class="btn btn-xs" onclick="openPositionSheet('2330', '台積電', state.currentDiagPrice || 2295)">+ 新增 / 試算持倉部位</button>
         </div>
 
         <!-- 電腦版持倉表 -->
@@ -1987,7 +1987,7 @@
       selectedEtfSymbol: '0050',
       selectedEtfYieldPct: 2.85,
       currentDiagSymbol: '2330',
-      currentDiagPrice: 1050.0,
+      currentDiagPrice: 2295.0,
       currentDiagName: '台積電',
       totalEquityTwd: 5650000,
       suggestedRiskShares: 1000,
@@ -2817,6 +2817,7 @@
         klineChart.isDragging = true;
         klineChart.dragStartX = clientX;
         klineChart.dragStartOffset = klineChart.panOffset;
+        canvas.style.cursor = 'grabbing';
         updateHoverFromCoords(clientX, clientY);
       };
 
@@ -2836,6 +2837,7 @@
 
       const onPointerUp = () => {
         klineChart.isDragging = false;
+        canvas.style.cursor = 'crosshair';
       };
 
       // Mouse events
@@ -3950,6 +3952,7 @@
         drawerKlineChart.isDragging = true;
         drawerKlineChart.dragStartX = clientX;
         drawerKlineChart.dragStartOffset = drawerKlineChart.panOffset;
+        canvas.style.cursor = 'grabbing';
         updateDrawerHoverFromCoords(clientX, clientY);
       };
 
@@ -3968,6 +3971,7 @@
 
       const onPointerUp = () => {
         drawerKlineChart.isDragging = false;
+        canvas.style.cursor = 'crosshair';
       };
 
       canvas.addEventListener('mousedown', (e) => {

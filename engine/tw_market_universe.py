@@ -74,7 +74,7 @@ class TaiwanETFProfile:
 # ==============================================================================
 CORE_TAIWAN_STOCKS: List[Dict[str, Any]] = [
     # --- 晶圓代工與先進製程 ---
-    {"symbol": "2330", "name": "台積電", "market": "TWSE", "primary_sector": "半導體", "theme_tags": ["晶圓代工", "AI晶片", "CoWoS先進封裝", "權值核心"], "price": 1050.0, "change_pct": 1.94, "volume_lots": 42850, "pe_ratio": 22.4, "pb_ratio": 6.4, "dividend_yield": 1.65, "roe": 29.8, "f_score": 8, "inst_flow_5d_lots": 28400, "kline_pattern": "帶量突破 20 日箱型頂部", "kline_bias": "BULLISH"},
+    {"symbol": "2330", "name": "台積電", "market": "TWSE", "primary_sector": "半導體", "theme_tags": ["晶圓代工", "AI晶片", "CoWoS先進封裝", "權值核心"], "price": 2295.0, "change_pct": -1.50, "volume_lots": 36567, "pe_ratio": 24.5, "pb_ratio": 6.8, "dividend_yield": 1.45, "roe": 31.2, "f_score": 8, "inst_flow_5d_lots": 28400, "kline_pattern": "均線多頭排列高檔強勢整理", "kline_bias": "BULLISH"},
     {"symbol": "2303", "name": "聯電", "market": "TWSE", "primary_sector": "半導體", "theme_tags": ["晶圓代工", "成熟製程", "高殖利率"], "price": 51.2, "change_pct": 0.39, "volume_lots": 35120, "pe_ratio": 11.8, "pb_ratio": 1.7, "dividend_yield": 5.85, "roe": 15.2, "f_score": 7, "inst_flow_5d_lots": -4200, "kline_pattern": "區間箱型量縮整理", "kline_bias": "NEUTRAL"},
     {"symbol": "3711", "name": "日月光投控", "market": "TWSE", "primary_sector": "半導體", "theme_tags": ["封測龍頭", "CoWoS先進封裝", "AI晶片"], "price": 166.5, "change_pct": 2.15, "volume_lots": 14800, "pe_ratio": 19.2, "pb_ratio": 2.4, "dividend_yield": 3.20, "roe": 13.8, "f_score": 7, "inst_flow_5d_lots": 6850, "kline_pattern": "多頭吞噬線", "kline_bias": "BULLISH"},
     {"symbol": "2449", "name": "京元電子", "market": "TWSE", "primary_sector": "半導體", "theme_tags": ["AI晶片測試", "CoWoS先進封裝", "輝達供應鏈"], "price": 131.0, "change_pct": 3.15, "volume_lots": 22400, "pe_ratio": 18.6, "pb_ratio": 3.8, "dividend_yield": 2.95, "roe": 20.4, "f_score": 8, "inst_flow_5d_lots": 9200, "kline_pattern": "帶量突破 20 日箱型頂部", "kline_bias": "BULLISH"},
@@ -573,10 +573,20 @@ class TaiwanMarketUniverseEngine:
         優先順序：
         1. 核心精選表 CORE_TAIWAN_STOCKS (含深度題材標籤、F-Score、PE、ROE)
         2. 全 ETF 清單 TAIWAN_ETFS_CATALOG
-        3. 全市場 2,300+ 上市櫃收盤資料庫
-        4. Yahoo Finance 即時行情動態解析
+        3. 全市場 2,400+ 上市櫃收盤資料庫
+        4. 證交所 TWSE MIS 盤中秒級即時行情
+        5. Yahoo Finance 即時行情動態備援
         """
         clean = symbol.replace(".TW", "").replace(".TWO", "").strip().upper()
+        now = time.time()
+
+        # 隨選即時：若快取無最新即時報價或逾期 10 秒，主動向 TWSE MIS 抓取最新盤中成交價
+        cached = self._quote_cache.get(clean)
+        if not cached or (now - cached.get("ts", 0.0)) > 10.0:
+            live_map = self.fetch_twse_mis_quotes([clean])
+            if clean in live_map:
+                cached = live_map[clean]
+
         # 1. 核心精選股
         for s in CORE_TAIWAN_STOCKS:
             if s["symbol"].upper() == clean:
@@ -584,18 +594,19 @@ class TaiwanMarketUniverseEngine:
                 if clean in self._full_stocks_cache:
                     meta["price"] = float(self._full_stocks_cache[clean]["price"])
                     meta["change_pct"] = float(self._full_stocks_cache[clean]["change_pct"])
-                cached = self._quote_cache.get(clean)
                 if cached:
                     meta["price"] = float(cached["price"])
                     meta["change_pct"] = float(cached["change_pct"])
+                    if cached.get("volume_lots", 0) > 0:
+                        meta["volume_lots"] = int(cached["volume_lots"])
                 return meta
 
         # 2. 全 ETF 清單
         for e in TAIWAN_ETFS_CATALOG:
             if e.etf_symbol.upper() == clean:
-                cached = self._quote_cache.get(clean)
                 px = float(cached["price"]) if cached else e.price
                 chg = float(cached["change_pct"]) if cached else e.change_pct
+                vol = int(cached["volume_lots"]) if cached and cached.get("volume_lots") else 18000
                 return {
                     "symbol": e.etf_symbol,
                     "name": e.etf_name,
@@ -604,27 +615,52 @@ class TaiwanMarketUniverseEngine:
                     "theme_tags": [e.category, e.issuer],
                     "price": px,
                     "change_pct": chg,
-                    "volume_lots": 18000,
+                    "volume_lots": vol,
                     "pe_ratio": 18.0,
                     "pb_ratio": 2.2,
                     "dividend_yield": e.annual_yield_pct,
                     "roe": 16.0,
                     "f_score": 8,
                     "inst_flow_5d_lots": 5200,
-                    "kline_pattern": "均線多頭排列穩步推升" if chg >= 0 else "區間箱型量縮整理",
+                    "kline_pattern": "均線多頭排列穩步推升" if chg >= 0 else "區民箱型量縮整理",
                     "kline_bias": "BULLISH" if chg >= 0 else "NEUTRAL",
                 }
 
-        # 3. 全台股上市櫃資料庫 (2,300+ 檔)
+        # 3. 全台股上市櫃資料庫 (2,400+ 檔)
         if clean in self._full_stocks_cache:
             item = dict(self._full_stocks_cache[clean])
-            cached = self._quote_cache.get(clean)
             if cached:
                 item["price"] = float(cached["price"])
                 item["change_pct"] = float(cached["change_pct"])
+                if cached.get("volume_lots", 0) > 0:
+                    item["volume_lots"] = int(cached["volume_lots"])
             return item
 
-        # 4. 動態備援 Yahoo Finance
+        # 4. TWSE MIS 成功抓到的未知標的
+        if cached:
+            px = float(cached["price"])
+            chg = float(cached["change_pct"])
+            name = cached.get("name") or f"台股 {clean}"
+            return {
+                "symbol": clean,
+                "name": name,
+                "market": "TWSE",
+                "primary_sector": "台股上市櫃",
+                "theme_tags": ["台股全市場"],
+                "price": px,
+                "change_pct": chg,
+                "volume_lots": int(cached.get("volume_lots", 1500)),
+                "pe_ratio": 17.0,
+                "pb_ratio": 2.1,
+                "dividend_yield": 3.2,
+                "roe": 14.0,
+                "f_score": 7,
+                "inst_flow_5d_lots": 500,
+                "kline_pattern": "均線多頭排列穩步推升" if chg >= 0 else "區間箱型量縮整理",
+                "kline_bias": "BULLISH" if chg >= 0 else "NEUTRAL",
+            }
+
+        # 5. 動態備援 Yahoo Finance
         yf_q = self._fetch_yahoo_quote(clean)
         if yf_q:
             px, chg = yf_q
@@ -999,78 +1035,70 @@ class TaiwanMarketUniverseEngine:
     ) -> Dict[str, Any]:
         """
         僅針對使用者當前畫面看得到的股票代號 (visible_symbols) 執行即時報價更新：
-        1. 單次上限 20 檔，防止捲動時瞬間打爆 API Rate Limit (Fugle 60次/分)。
-        2. 5 秒記憶體快取去重 (TTL Deduplication)：5 秒內已查詢過的標的直接回傳快取，零額外 API 消耗。
+        1. 5 秒記憶體快取去重 (TTL Deduplication)：5 秒內已查詢過的標的直接回傳快取，零額外 API 消耗。
+        2. 批次向證交所官方 TWSE MIS 端點發送單一請求 (單次上限 35 檔)，毫秒級取得官方最新成交價與漲跌。
+        3. 未涵蓋標的平滑備援至 Fugle、Yahoo Finance 或全台股收盤資料庫。
         """
         now = time.time()
         clean_syms: List[str] = []
         for s in visible_symbols:
-            s_up = str(s).strip().upper()
+            s_up = str(s).replace(".TW", "").replace(".TWO", "").strip().upper()
             if s_up and s_up not in clean_syms:
                 clean_syms.append(s_up)
-        clean_syms = clean_syms[:20]
+        clean_syms = clean_syms[:35]
 
         quotes_out: Dict[str, Dict[str, Any]] = {}
         cache_hits = 0
-        api_fetches = 0
+        symbols_to_fetch: List[str] = []
 
-        # 建立基礎價格查找表 (以全市場 2,300+ 檔真實最新收盤資料庫為核心基準)
-        base_lookup: Dict[str, Tuple[str, float, float, int]] = {}
-        for code, item in self._full_stocks_cache.items():
-            base_lookup[code] = (item["name"], float(item["price"]), float(item["change_pct"]), int(item.get("volume_lots", 1000)))
-        for s in CORE_TAIWAN_STOCKS:
-            sym = s["symbol"]
-            if sym in base_lookup:
-                name = s["name"]
-                base_lookup[sym] = (name, base_lookup[sym][1], base_lookup[sym][2], base_lookup[sym][3])
-            else:
-                base_lookup[sym] = (s["name"], float(s["price"]), float(s["change_pct"]), int(s["volume_lots"]))
-        for e in TAIWAN_ETFS_CATALOG:
-            base_lookup[e.etf_symbol] = (e.etf_name, float(e.price), float(e.change_pct), 15000)
-
+        # 1. 檢查快取
         for sym in clean_syms:
             cached = self._quote_cache.get(sym)
             if cached and (now - cached.get("ts", 0.0)) < self._quote_cache_ttl_sec:
                 quotes_out[sym] = cached
                 cache_hits += 1
-                continue
+            else:
+                symbols_to_fetch.append(sym)
 
-            name, base_px, base_chg, base_vol = base_lookup.get(sym, (sym, 100.0, 0.0, 1000))
-            live_px = base_px
-            live_chg = base_chg
-            live_vol = base_vol
+        live_api_calls = 0
+
+        # 2. 優先向證交所官方 TWSE MIS 端點發起批次查詢 (單一 HTTP 請求獲取全域秒級價格)
+        if symbols_to_fetch:
+            mis_results = self.fetch_twse_mis_quotes(symbols_to_fetch)
+            if mis_results:
+                live_api_calls += 1
+                for sym, q in mis_results.items():
+                    quotes_out[sym] = q
+                symbols_to_fetch = [s for s in symbols_to_fetch if s not in mis_results]
+
+        # 3. 針對 MIS 未覆蓋或非交易時段之標的，動態備援
+        for sym in symbols_to_fetch:
+            meta = self.get_stock_meta(sym)
+            live_px = float(meta.get("price", 100.0))
+            live_chg = float(meta.get("change_pct", 0.0))
+            live_vol = int(meta.get("volume_lots", 1000))
+            name = meta.get("name", sym)
             source = "REAL_MARKET_DATABASE"
 
-            # 1. 優先嘗試 Fugle 即時報價 API（支援官方標準回傳與即時成交撮合）
-            if fugle_adapter is not None and getattr(fugle_adapter, "is_configured", False) and api_fetches < 5:
+            if fugle_adapter is not None and getattr(fugle_adapter, "is_configured", False) and live_api_calls < 5:
                 try:
                     q_res = fugle_adapter.fetch_intraday_quote(sym)
                     if isinstance(q_res, dict):
                         last_p = q_res.get("lastPrice") or q_res.get("closePrice")
                         if last_p is not None:
                             live_px = float(last_p)
-                            if "changePercent" in q_res and q_res["changePercent"] is not None:
-                                live_chg = round(float(q_res["changePercent"]), 2)
-                            else:
-                                ref_p = q_res.get("referencePrice") or q_res.get("previousClose") or base_px
-                                live_chg = round((live_px - float(ref_p)) / float(ref_p) * 100.0, 2) if ref_p else base_chg
+                            live_chg = float(q_res.get("changePercent", live_chg))
                             source = "FUGLE_LIVE_API"
-                            api_fetches += 1
+                            live_api_calls += 1
                 except Exception:
                     pass
 
-            # 2. 若盤後或 Fugle 未回傳，嘗試 Yahoo Finance v8 Chart API 備援
-            if source != "FUGLE_LIVE_API" and api_fetches < 5:
+            if source == "REAL_MARKET_DATABASE" and live_api_calls < 5:
                 yf_res = self._fetch_yahoo_quote(sym)
                 if yf_res:
                     live_px, live_chg = yf_res
                     source = "YAHOO_V8_API"
-                    api_fetches += 1
-
-            # 3. 離線或收盤時段，嚴格以證交所/櫃買真實日收盤數據為準（絕不施加隨機浮動）
-            if source not in ("FUGLE_LIVE_API", "YAHOO_V8_API"):
-                live_px = base_px
-                live_chg = base_chg
+                    live_api_calls += 1
 
             quote_entry = {
                 "symbol": sym,
@@ -1088,10 +1116,110 @@ class TaiwanMarketUniverseEngine:
         return {
             "requested_count": len(clean_syms),
             "cache_hits": cache_hits,
-            "live_api_calls": api_fetches,
-            "rate_limit_protection": "ACTIVE (5s TTL + Viewport-Only Filtering)",
+            "live_api_calls": live_api_calls,
+            "rate_limit_protection": "ACTIVE (5s TTL + TWSE MIS Batch)",
             "quotes": quotes_out,
         }
+
+    def fetch_twse_mis_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        向證交所基本市況報導 (TWSE MIS) 批次抓取盤中秒級即時行情 (支援上市 tse 與上櫃 otc)。
+        """
+        if not symbols:
+            return {}
+
+        now = time.time()
+        results: Dict[str, Dict[str, Any]] = {}
+
+        # 依據資料庫判定 tse 或 otc，未知則兩者皆查
+        ex_chs: List[str] = []
+        for s in symbols:
+            clean = s.replace(".TW", "").replace(".TWO", "").strip().upper()
+            item = self._full_stocks_cache.get(clean)
+            if item:
+                mkt = item.get("market", "TWSE")
+                ex = "otc" if mkt == "TPEx" else "tse"
+                ex_chs.append(f"{ex}_{clean}.tw")
+            else:
+                ex_chs.append(f"tse_{clean}.tw")
+                ex_chs.append(f"otc_{clean}.tw")
+
+        # 批次分包，每包最多 35 檔
+        chunk_size = 35
+        for i in range(0, len(ex_chs), chunk_size):
+            chunk = ex_chs[i : i + chunk_size]
+            ch_param = "|".join(chunk)
+            ts = int(now * 1000)
+            url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={ch_param}&json=1&delay=0&_={ts}"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=3.5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    msg_arr = data.get("msgArray", [])
+                    for item in msg_arr:
+                        code = item.get("c")
+                        if not code:
+                            continue
+                        code = str(code).strip().upper()
+                        name = item.get("n", code)
+                        z_str = item.get("z", "-")
+                        y_str = item.get("y", "-")
+                        v_str = item.get("v", "0")
+                        t_str = item.get("t", datetime.now().strftime("%H:%M:%S"))
+
+                        try:
+                            y = float(y_str) if y_str not in ("-", "") else 0.0
+                        except Exception:
+                            y = 0.0
+
+                        try:
+                            if z_str not in ("-", ""):
+                                px = float(z_str)
+                            else:
+                                b_str = item.get("b", "_").split("_")[0]
+                                px = float(b_str) if b_str not in ("-", "") else y
+                        except Exception:
+                            px = y
+
+                        if y > 0 and px > 0:
+                            chg_pct = round(((px - y) / y) * 100.0, 2)
+                        else:
+                            chg_pct = 0.0
+
+                        try:
+                            vol_lots = int(v_str) if str(v_str).isdigit() else 0
+                        except Exception:
+                            vol_lots = 0
+
+                        q_entry = {
+                            "symbol": code,
+                            "name": name,
+                            "price": px,
+                            "change_pct": chg_pct,
+                            "volume_lots": vol_lots,
+                            "prev_close": y,
+                            "updated_at": t_str,
+                            "source": "TWSE_MIS_REALTIME",
+                            "ts": now,
+                        }
+                        results[code] = q_entry
+                        self._quote_cache[code] = q_entry
+
+                        if code in self._full_stocks_cache:
+                            self._full_stocks_cache[code]["price"] = px
+                            self._full_stocks_cache[code]["change_pct"] = chg_pct
+                            if vol_lots > 0:
+                                self._full_stocks_cache[code]["volume_lots"] = vol_lots
+            except Exception:
+                continue
+
+        return results
 
     def _fetch_yahoo_quote(self, symbol: str) -> Optional[Tuple[float, float]]:
         """向環境變數 YAHOO_FINANCE_CHART_URL 查詢個股或 ETF 最新市價與漲跌幅 (自動辨識上市 .TW 與上櫃 .TWO)"""
@@ -1117,16 +1245,23 @@ class TaiwanMarketUniverseEngine:
                 continue
         return None
 
-    def _fetch_twse_openapi_stocks(self) -> List[Dict[str, Any]]:
-        """向證交所官方免費無限制 OpenAPI 與櫃買中心 OpenAPI 抓取全市場上市櫃日收盤資訊 (含 10 分鐘快取)"""
+    def refresh_full_market_catalog(self, force: bool = False) -> int:
+        """
+        向證交所官方 OpenAPI 與櫃買中心 OpenAPI 完整抓取全台灣所有上市股票、上櫃股票與 ETF (共約 2,400+ 檔)
+        過濾排除權證，並持久化至 user_data/taiwan_full_market_cache.json。
+        """
         now = time.time()
-        if self._twse_full_catalog_cache and (now - self._twse_catalog_fetched_at) < 600:
-            return self._twse_full_catalog_cache
+        cache_path = Path(__file__).resolve().parent.parent / "user_data" / "taiwan_full_market_cache.json"
 
-        url = load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") or "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
-        req = urllib.request.Request(url, headers={"User-Agent": "AlphaMind-Quantitative/2.0"})
-        parsed: List[Dict[str, Any]] = []
+        if not force and self._full_stocks_cache and (now - self._twse_catalog_fetched_at) < 43200:
+            return len(self._full_stocks_cache)
+
+        new_catalog: Dict[str, Dict[str, Any]] = {}
+
+        # 1. TWSE 上市股票與 ETF
+        twse_url = load_env_variable("TWSE_OPENAPI_STOCK_DAY_ALL") or "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
         try:
+            req = urllib.request.Request(twse_url, headers={"User-Agent": "AlphaMind-Quant/2.0"})
             with urllib.request.urlopen(req, timeout=8.0) as resp:
                 rows = json.loads(resp.read().decode("utf-8"))
                 for r in rows:
@@ -1137,18 +1272,20 @@ class TaiwanMarketUniverseEngine:
                     vol_str = str(r.get("TradeVolume", "0")).replace(",", "").strip()
                     if not code or not close_str or close_str == "--":
                         continue
+                    if not self._is_stock_or_etf(code):
+                        continue
                     try:
                         px = float(close_str)
                         chg_val = float(chg_str) if chg_str not in ("", "--", "X") else 0.0
                         prev_px = max(0.01, px - chg_val)
                         chg_pct = round(chg_val / prev_px * 100.0, 2)
                         vol_lots = int(float(vol_str) // 1000) if vol_str.isdigit() else 500
-                        parsed.append({
+                        new_catalog[code] = {
                             "symbol": code,
                             "name": name,
                             "market": "TWSE",
-                            "primary_sector": "上市一般股",
-                            "theme_tags": ["台股全市場"],
+                            "primary_sector": "ETF 基金" if code.startswith("00") else "上市股票",
+                            "theme_tags": ["台股全市場", "上市市場"],
                             "price": px,
                             "change_pct": chg_pct,
                             "volume_lots": vol_lots,
@@ -1158,22 +1295,87 @@ class TaiwanMarketUniverseEngine:
                             "roe": 12.0,
                             "f_score": 6,
                             "inst_flow_5d_lots": 0,
-                            "kline_pattern": "區間箱型量縮整理",
-                            "kline_bias": "NEUTRAL",
-                        })
+                            "kline_pattern": "均線多頭排列穩步推升" if chg_pct >= 0 else "區間箱型量縮整理",
+                            "kline_bias": "BULLISH" if chg_pct >= 0 else "NEUTRAL",
+                        }
                     except Exception:
                         continue
-            if parsed:
-                self._twse_full_catalog_cache = parsed
-                self._twse_catalog_fetched_at = now
-                for item in parsed:
-                    c = item["symbol"]
-                    if c in self._full_stocks_cache:
-                        self._full_stocks_cache[c]["price"] = item["price"]
-                        self._full_stocks_cache[c]["change_pct"] = item["change_pct"]
-                        self._full_stocks_cache[c]["volume_lots"] = item["volume_lots"]
-                    else:
-                        self._full_stocks_cache[c] = item
         except Exception:
             pass
-        return parsed
+
+        # 2. TPEx 上櫃股票與 ETF
+        tpex_url = load_env_variable("TPEX_OPENAPI_DAILY_CLOSE") or "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+        try:
+            req = urllib.request.Request(tpex_url, headers={"User-Agent": "AlphaMind-Quant/2.0"})
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
+                rows = json.loads(resp.read().decode("utf-8"))
+                for r in rows:
+                    code = str(r.get("SecuritiesCompanyCode", "")).strip()
+                    name = str(r.get("CompanyName", "")).strip()
+                    close_str = str(r.get("Close", "0")).replace(",", "").strip()
+                    chg_str = str(r.get("Change", "0")).replace(",", "").replace("+", "").strip()
+                    vol_str = str(r.get("TradingShares", "0")).replace(",", "").strip()
+                    if not code or not close_str or close_str == "--" or code in new_catalog:
+                        continue
+                    if not self._is_stock_or_etf(code):
+                        continue
+                    try:
+                        px = float(close_str)
+                        chg_val = float(chg_str) if chg_str not in ("", "--", "X") else 0.0
+                        prev_px = max(0.01, px - chg_val)
+                        chg_pct = round(chg_val / prev_px * 100.0, 2)
+                        vol_lots = int(float(vol_str) // 1000) if vol_str.isdigit() else 300
+                        new_catalog[code] = {
+                            "symbol": code,
+                            "name": name,
+                            "market": "TPEx",
+                            "primary_sector": "ETF 基金" if code.startswith("00") else "上櫃股票",
+                            "theme_tags": ["台股全市場", "上櫃市場"],
+                            "price": px,
+                            "change_pct": chg_pct,
+                            "volume_lots": vol_lots,
+                            "pe_ratio": 18.0,
+                            "pb_ratio": 2.2,
+                            "dividend_yield": 2.8,
+                            "roe": 14.5,
+                            "f_score": 6,
+                            "inst_flow_5d_lots": 0,
+                            "kline_pattern": "均線多頭排列穩步推升" if chg_pct >= 0 else "區間箱型量縮整理",
+                            "kline_bias": "BULLISH" if chg_pct >= 0 else "NEUTRAL",
+                        }
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+        if len(new_catalog) >= 1500:
+            self._full_stocks_cache = new_catalog
+            self._twse_catalog_fetched_at = now
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps(new_catalog, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+            for s in CORE_TAIWAN_STOCKS:
+                sym = s["symbol"].upper()
+                if sym in self._full_stocks_cache:
+                    real = self._full_stocks_cache[sym]
+                    s["price"] = float(real["price"])
+                    s["change_pct"] = float(real["change_pct"])
+                    if "volume_lots" in real:
+                        s["volume_lots"] = int(real["volume_lots"])
+
+        return len(self._full_stocks_cache)
+
+    @staticmethod
+    def _is_stock_or_etf(code: str) -> bool:
+        c = code.strip()
+        if len(c) == 4 and c.isdigit():
+            return True
+        if len(c) in (5, 6) and (c.startswith("00") or c.startswith("01") or c.startswith("02")):
+            return True
+        return False
+
+    def _fetch_twse_openapi_stocks(self) -> List[Dict[str, Any]]:
+        self.refresh_full_market_catalog()
+        return list(self._full_stocks_cache.values())
