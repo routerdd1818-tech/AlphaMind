@@ -556,6 +556,17 @@ class TaiwanMarketUniverseEngine:
             except Exception:
                 self._full_stocks_cache = {}
 
+        # 立即以全市場真實資料庫同步更新 CORE_TAIWAN_STOCKS 基準現價、漲跌幅與成交量
+        if self._full_stocks_cache:
+            for s in CORE_TAIWAN_STOCKS:
+                sym = s["symbol"].upper()
+                if sym in self._full_stocks_cache:
+                    real = self._full_stocks_cache[sym]
+                    s["price"] = float(real["price"])
+                    s["change_pct"] = float(real["change_pct"])
+                    if "volume_lots" in real:
+                        s["volume_lots"] = int(real["volume_lots"])
+
     def get_stock_meta(self, symbol: str) -> Dict[str, Any]:
         """
         全市場任意台股標的元資料解析：
@@ -683,8 +694,18 @@ class TaiwanMarketUniverseEngine:
         for s in all_raw_stocks:
             sym = s["symbol"]
             cached = self._quote_cache.get(sym)
-            px = float(cached["price"]) if cached else float(s["price"])
-            chg = float(cached["change_pct"]) if cached else float(s["change_pct"])
+            if cached:
+                px = float(cached["price"])
+                chg = float(cached["change_pct"])
+            elif sym in self._full_stocks_cache:
+                px = float(self._full_stocks_cache[sym]["price"])
+                chg = float(self._full_stocks_cache[sym]["change_pct"])
+            else:
+                px = float(s["price"])
+                chg = float(s["change_pct"])
+
+            s["price"] = px
+            s["change_pct"] = chg
 
             # 快速篩選 (加速巨量清單處理)
             if sector_filter and sector_filter != "ALL":
@@ -993,15 +1014,19 @@ class TaiwanMarketUniverseEngine:
         cache_hits = 0
         api_fetches = 0
 
-        # 建立基礎價格查找表 (納入全台股 2,300+ 檔標的與全 ETF)
+        # 建立基礎價格查找表 (以全市場 2,300+ 檔真實最新收盤資料庫為核心基準)
         base_lookup: Dict[str, Tuple[str, float, float, int]] = {}
+        for code, item in self._full_stocks_cache.items():
+            base_lookup[code] = (item["name"], float(item["price"]), float(item["change_pct"]), int(item.get("volume_lots", 1000)))
         for s in CORE_TAIWAN_STOCKS:
-            base_lookup[s["symbol"]] = (s["name"], float(s["price"]), float(s["change_pct"]), int(s["volume_lots"]))
+            sym = s["symbol"]
+            if sym in base_lookup:
+                name = s["name"]
+                base_lookup[sym] = (name, base_lookup[sym][1], base_lookup[sym][2], base_lookup[sym][3])
+            else:
+                base_lookup[sym] = (s["name"], float(s["price"]), float(s["change_pct"]), int(s["volume_lots"]))
         for e in TAIWAN_ETFS_CATALOG:
             base_lookup[e.etf_symbol] = (e.etf_name, float(e.price), float(e.change_pct), 15000)
-        for code, item in self._full_stocks_cache.items():
-            if code not in base_lookup:
-                base_lookup[code] = (item["name"], float(item["price"]), float(item["change_pct"]), int(item.get("volume_lots", 1000)))
 
         for sym in clean_syms:
             cached = self._quote_cache.get(sym)
@@ -1014,39 +1039,38 @@ class TaiwanMarketUniverseEngine:
             live_px = base_px
             live_chg = base_chg
             live_vol = base_vol
-            source = "CACHED_TICK_STREAM"
+            source = "REAL_MARKET_DATABASE"
 
-            # 1. 優先嘗試 Fugle 即時報價 API（每次可視批次最多打 3 檔外部 HTTP 保護額度）
-            if fugle_adapter is not None and getattr(fugle_adapter, "is_configured", False) and api_fetches < 3:
+            # 1. 優先嘗試 Fugle 即時報價 API（支援官方標準回傳與即時成交撮合）
+            if fugle_adapter is not None and getattr(fugle_adapter, "is_configured", False) and api_fetches < 5:
                 try:
                     q_res = fugle_adapter.fetch_intraday_quote(sym)
-                    if q_res.get("status") == "LIVE_OK" and q_res.get("data"):
-                        d = q_res["data"]
-                        last_p = d.get("lastPrice") or d.get("closePrice")
-                        ref_p = d.get("referencePrice") or base_px
-                        if last_p:
+                    if isinstance(q_res, dict):
+                        last_p = q_res.get("lastPrice") or q_res.get("closePrice")
+                        if last_p is not None:
                             live_px = float(last_p)
-                            live_chg = round((live_px - float(ref_p)) / float(ref_p) * 100.0, 2) if ref_p else base_chg
+                            if "changePercent" in q_res and q_res["changePercent"] is not None:
+                                live_chg = round(float(q_res["changePercent"]), 2)
+                            else:
+                                ref_p = q_res.get("referencePrice") or q_res.get("previousClose") or base_px
+                                live_chg = round((live_px - float(ref_p)) / float(ref_p) * 100.0, 2) if ref_p else base_chg
                             source = "FUGLE_LIVE_API"
                             api_fetches += 1
                 except Exception:
                     pass
 
             # 2. 若盤後或 Fugle 未回傳，嘗試 Yahoo Finance v8 Chart API 備援
-            if source != "FUGLE_LIVE_API" and api_fetches < 3:
+            if source != "FUGLE_LIVE_API" and api_fetches < 5:
                 yf_res = self._fetch_yahoo_quote(sym)
                 if yf_res:
                     live_px, live_chg = yf_res
                     source = "YAHOO_V8_API"
                     api_fetches += 1
 
-            # 3. 若離線或收盤時段，使用微幅五檔跳動或快取基準
+            # 3. 離線或收盤時段，嚴格以證交所/櫃買真實日收盤數據為準（絕不施加隨機浮動）
             if source not in ("FUGLE_LIVE_API", "YAHOO_V8_API"):
-                tick_seed = (int(now // 3) + sum(ord(c) for c in sym)) % 5 - 2
-                tick_step = 0.5 if base_px >= 100 else (0.1 if base_px >= 20 else 0.05)
-                live_px = round(base_px + tick_seed * tick_step, 2)
-                prev_close = base_px / (1.0 + base_chg / 100.0) if base_chg != -100 else base_px
-                live_chg = round((live_px - prev_close) / prev_close * 100.0, 2)
+                live_px = base_px
+                live_chg = base_chg
 
             quote_entry = {
                 "symbol": sym,
@@ -1103,9 +1127,9 @@ class TaiwanMarketUniverseEngine:
         req = urllib.request.Request(url, headers={"User-Agent": "AlphaMind-Quantitative/2.0"})
         parsed: List[Dict[str, Any]] = []
         try:
-            with urllib.request.urlopen(req, timeout=3.5) as resp:
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
                 rows = json.loads(resp.read().decode("utf-8"))
-                for r in rows[:300]:
+                for r in rows:
                     code = str(r.get("Code", "")).strip()
                     name = str(r.get("Name", "")).strip()
                     close_str = str(r.get("ClosingPrice", "0")).replace(",", "").strip()
@@ -1142,6 +1166,14 @@ class TaiwanMarketUniverseEngine:
             if parsed:
                 self._twse_full_catalog_cache = parsed
                 self._twse_catalog_fetched_at = now
+                for item in parsed:
+                    c = item["symbol"]
+                    if c in self._full_stocks_cache:
+                        self._full_stocks_cache[c]["price"] = item["price"]
+                        self._full_stocks_cache[c]["change_pct"] = item["change_pct"]
+                        self._full_stocks_cache[c]["volume_lots"] = item["volume_lots"]
+                    else:
+                        self._full_stocks_cache[c] = item
         except Exception:
             pass
         return parsed
