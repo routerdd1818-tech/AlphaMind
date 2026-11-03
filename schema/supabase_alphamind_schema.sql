@@ -327,10 +327,25 @@ CREATE TABLE IF NOT EXISTS etf_constituents (
 CREATE INDEX IF NOT EXISTS idx_etf_constituents_stock ON etf_constituents(stock_symbol, weight_pct DESC);
 
 -- ------------------------------------------------------------------------------
--- 8. User Asset Calculator, Positions, Watchlists & Price/Pattern Alerts
+-- 8. Multi-User Accounts, Isolated User Portfolios, Positions, Watchlists & Alerts
+--    - 股票與 ETF 市場資料（companies, etf_profiles, etf_constituents）全體共用可讀
+--    - 使用者個人資產、持倉、自選股、策略參數與提醒依 user_id 嚴格隔離 (RLS)
 -- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS alphamind_users (
+    user_id VARCHAR(64) PRIMARY KEY,               -- e.g. 'usr_alpha_admin_01' or Supabase auth.uid()::text
+    username VARCHAR(64) NOT NULL UNIQUE,
+    display_name VARCHAR(64) NOT NULL,
+    email VARCHAR(128) NOT NULL UNIQUE,
+    password_salt VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(128) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
+    strategy_prefs JSONB NOT NULL DEFAULT '{"atr_period": 14, "atr_multiplier": 2.5, "base_position_pct": 15.0, "min_f_score": 6, "fee_discount": 0.60, "poll_interval_sec": 6}'::jsonb,
+    last_login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS user_portfolios (
-    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(64) PRIMARY KEY REFERENCES alphamind_users(user_id) ON DELETE CASCADE,
     cash_twd NUMERIC(18, 2) NOT NULL DEFAULT 1500000.00,
     fee_discount NUMERIC(4, 2) NOT NULL DEFAULT 0.60,
     polling_interval_sec INT NOT NULL DEFAULT 6,
@@ -339,7 +354,7 @@ CREATE TABLE IF NOT EXISTS user_portfolios (
 
 CREATE TABLE IF NOT EXISTS user_positions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
     stock_symbol VARCHAR(16) NOT NULL,
     stock_name VARCHAR(64) NOT NULL,
     shares BIGINT NOT NULL CHECK (shares > 0),
@@ -354,7 +369,7 @@ CREATE TABLE IF NOT EXISTS user_positions (
 
 CREATE TABLE IF NOT EXISTS user_watchlists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
     stock_symbol VARCHAR(16) NOT NULL,
     stock_name VARCHAR(64) NOT NULL,
     target_buy_price NUMERIC(14, 4),
@@ -364,7 +379,7 @@ CREATE TABLE IF NOT EXISTS user_watchlists (
 
 CREATE TABLE IF NOT EXISTS price_pattern_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
+    user_id VARCHAR(64) REFERENCES user_portfolios(user_id) ON DELETE CASCADE,
     stock_symbol VARCHAR(16) NOT NULL,
     alert_type VARCHAR(32) NOT NULL,               -- 'TARGET_PRICE_REACHED', 'STOP_LOSS_WARNING', 'KLINE_PATTERN_TRANSITION'
     severity VARCHAR(16) NOT NULL DEFAULT 'MEDIUM',
@@ -376,6 +391,39 @@ CREATE TABLE IF NOT EXISTS price_pattern_alerts (
     is_read BOOLEAN NOT NULL DEFAULT false,
     triggered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Enable Row Level Security (RLS): 市場股票與 ETF 全體已驗證使用者共用，個人資產與持倉嚴格隔離
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE etf_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE etf_constituents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_portfolios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_watchlists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE price_pattern_alerts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Shared Market Data Readable by All Authenticated Users" ON companies;
+CREATE POLICY "Shared Market Data Readable by All Authenticated Users"
+    ON companies FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Shared ETF Profiles Readable by All Authenticated Users" ON etf_profiles;
+CREATE POLICY "Shared ETF Profiles Readable by All Authenticated Users"
+    ON etf_profiles FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Shared ETF Constituents Readable by All Authenticated Users" ON etf_constituents;
+CREATE POLICY "Shared ETF Constituents Readable by All Authenticated Users"
+    ON etf_constituents FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users Isolate Own Portfolio" ON user_portfolios;
+CREATE POLICY "Users Isolate Own Portfolio"
+    ON user_portfolios FOR ALL USING (user_id = current_setting('request.jwt.claim.sub', true));
+
+DROP POLICY IF EXISTS "Users Isolate Own Positions" ON user_positions;
+CREATE POLICY "Users Isolate Own Positions"
+    ON user_positions FOR ALL USING (user_id = current_setting('request.jwt.claim.sub', true));
+
+DROP POLICY IF EXISTS "Users Isolate Own Watchlists" ON user_watchlists;
+CREATE POLICY "Users Isolate Own Watchlists"
+    ON user_watchlists FOR ALL USING (user_id = current_setting('request.jwt.claim.sub', true));
 
 -- ------------------------------------------------------------------------------
 -- 9. AlphaMind Unified Cloud API Vault (儲存所有第三方與公開 API 憑證與端點)

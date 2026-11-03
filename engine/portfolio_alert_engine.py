@@ -51,9 +51,10 @@ class PortfolioAndAlertEngine:
     以及「到達策略目標價提醒」與「K 線型態轉變提醒」引擎。
     """
 
-    def __init__(self, state_path: Optional[Path] = None) -> None:
+    def __init__(self, state_path: Optional[Path] = None, auto_seed: bool = True) -> None:
         default_path = Path(__file__).resolve().parent.parent / "user_portfolio_state.json"
         self.state_path = state_path or default_path
+        self.auto_seed = auto_seed
         self.cash_twd: float = 1_500_000.0
         self.fee_discount: float = 0.60  # 預設電子下單手續費 6 折 (0.1425% * 0.6)
         self.positions: List[PositionEntry] = []
@@ -71,6 +72,9 @@ class PortfolioAndAlertEngine:
                 return
             except Exception:
                 pass
+
+        if not self.auto_seed:
+            return
 
         # 預設展示持倉與自選股（可隨時由前端新增/修改/刪除）
         self.cash_twd = 1_500_000.0

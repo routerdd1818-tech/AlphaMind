@@ -4,6 +4,7 @@
 !.env.example
 config.ini
 user_portfolio_state.json
+user_data/
 *.p12
 !config.example.ini
 

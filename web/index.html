@@ -694,6 +694,53 @@
       border-color: var(--brand-blue);
     }
 
+    /* Full-Screen Mandatory Login Gate Overlay */
+    .auth-gate-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg-canvas);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .auth-gate-overlay.hidden {
+      display: none;
+    }
+
+    .auth-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      width: 100%;
+      max-width: 440px;
+      padding: 24px 22px;
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .user-chip:hover {
+      border-color: var(--brand-blue);
+      color: var(--brand-blue);
+    }
+
     /* Responsive Breakpoints */
     @media (max-width: 960px) {
       .desktop-nav {
@@ -745,6 +792,105 @@
 </head>
 <body>
 
+  <!-- ===================================================================== -->
+  <!-- Full-Screen Mandatory Login & Auto-Credential Gate Overlay            -->
+  <!-- ===================================================================== -->
+  <div id="authGateOverlay" class="auth-gate-overlay">
+    <div class="auth-card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="brand-mark" style="width:34px; height:34px; font-size:15px;">AM</div>
+          <div>
+            <div style="font-size:17px; font-weight:700; color:var(--text-primary);">AlphaMind 專屬帳戶登入</div>
+            <div style="font-size:12px; color:var(--text-muted);">個人資產與持倉獨立隔離・台股與 ETF 行情全站共用</div>
+          </div>
+        </div>
+        <span class="badge badge-blue">強制登入保護</span>
+      </div>
+
+      <!-- 登入 / 註冊切換 Pill -->
+      <div class="pill-bar" style="padding:0 0 12px 0; display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+        <button id="authTabLoginBtn" type="button" class="pill active" style="text-align:center;" onclick="switchAuthMode('login')">現有帳號登入</button>
+        <button id="authTabRegBtn" type="button" class="pill" style="text-align:center;" onclick="switchAuthMode('register')">註冊新使用者</button>
+      </div>
+
+      <div id="authErrorBanner" style="display:none; padding:9px 12px; border-radius:8px; background:var(--up-bg); color:var(--up-color); font-size:12px; font-weight:600; margin-bottom:12px;"></div>
+
+      <!-- 支援瀏覽器與手機原生自動記憶密碼表單 -->
+      <form id="authForm" onsubmit="submitAuthForm(event)" autocomplete="on">
+        <div class="field-group" style="margin-bottom:10px;">
+          <label class="field-label" for="authUsernameInput">使用者帳號 (Username / Email)</label>
+          <input
+            id="authUsernameInput"
+            name="username"
+            type="text"
+            autocomplete="username"
+            required
+            class="field-input num"
+            placeholder="請輸入帳號，如 tang921118"
+          />
+        </div>
+
+        <div class="field-group" style="margin-bottom:10px;">
+          <label class="field-label" for="authPasswordInput">登入密碼 (Password)</label>
+          <input
+            id="authPasswordInput"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            class="field-input num"
+            placeholder="請輸入密碼"
+          />
+        </div>
+
+        <!-- 註冊模式額外欄位 -->
+        <div id="authRegisterFields" style="display:none; margin-bottom:10px;">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label" for="authDisplayNameInput">顯示名稱 / 帳戶別名</label>
+              <input id="authDisplayNameInput" type="text" class="field-input" placeholder="如：王先生 (波段專戶)" />
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="authInitCashInput">初始現金部位 (TWD)</label>
+              <input id="authInitCashInput" type="number" class="field-input num" value="1500000" step="50000" />
+            </div>
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); cursor:pointer; margin:10px 0 14px;">
+          <input id="authRememberChk" type="checkbox" checked style="accent-color:var(--brand-blue); width:15px; height:15px;" />
+          <span>自動記憶帳號密碼並保持登入狀態（下次開啟免重複輸入）</span>
+        </label>
+
+        <button id="authSubmitBtn" type="submit" class="btn" style="width:100%; padding:10px; font-size:14px;">
+          立即登入並載入個人資產池
+        </button>
+      </form>
+
+      <!-- 快速切換展示帳號（方便直接驗證多使用者資料隔離） -->
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+        <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">
+          一鍵帶入展示帳號（驗證不同使用者持倉隔離、股票/ETF 資料共用）：
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button type="button" class="btn btn-ghost btn-xs" style="justify-content:flex-start; text-align:left; padding:8px 10px;" onclick="quickFillDemoAccount('tang921118', 'alpha8888')">
+            <div>
+              <div class="num" style="font-weight:700; color:var(--brand-blue);">帳號 A：tang921118</div>
+              <div style="font-size:11px; color:var(--text-muted);">AI 半導體波段持倉</div>
+            </div>
+          </button>
+          <button type="button" class="btn btn-ghost btn-xs" style="justify-content:flex-start; text-align:left; padding:8px 10px;" onclick="quickFillDemoAccount('etf_income', 'alpha8888')">
+            <div>
+              <div class="num" style="font-weight:700; color:var(--brand-blue);">帳號 B：etf_income</div>
+              <div style="font-size:11px; color:var(--text-muted);">高股息 ETF 存股專戶</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Top Navigation Header -->
   <header class="topbar">
     <div class="topbar-inner">
@@ -765,7 +911,7 @@
         <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')">總經與設定</button>
       </nav>
 
-      <!-- Viewport On-Demand Quote Status & Instant Autocomplete Search -->
+      <!-- Viewport On-Demand Quote Status, User Account Chip & Instant Autocomplete Search -->
       <div class="topbar-right">
         <div class="viewport-status" title="僅針對畫面可視範圍內之股票進行報價更新，保護 API 呼叫額度">
           <span class="pulse-dot"></span>
@@ -786,6 +932,9 @@
           />
           <button class="btn btn-xs" style="padding:7px 11px;" onclick="closeSearchDropdown(); jumpToDiagnosis();">診斷</button>
           <div id="searchDropdown" class="search-dropdown"></div>
+        </div>
+        <div id="topbarUserChip" class="user-chip" onclick="switchTab('settings')" title="點擊管理或切換使用者帳號">
+          <span id="topbarUserName">未登入</span>
         </div>
       </div>
     </div>
@@ -1318,6 +1467,30 @@
     <!-- VIEW 5: 6 國總經監控、個人化策略參數設定與 API 連線狀態 (Settings)    -->
     <!-- =================================================================== -->
     <section id="view-settings" class="view-panel">
+      <!-- 多使用者登入狀態、資料隔離說明與快速切換卡片 -->
+      <div class="card" style="margin-bottom: 14px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">目前登入使用者與多租戶資料隔離中心</div>
+            <div class="card-subtitle">個人現金、持倉、自選股與提醒依 User ID 完全獨立隔離；全台股與台灣 ETF 行情快取全站共用</div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-xs" onclick="openSwitchAccountModal()">切換其他帳號 / 新增使用者</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--up-color); border-color:#FECACA;" onclick="handleLogout()">安全登出</button>
+          </div>
+        </div>
+        <div class="form-grid-2">
+          <div style="padding:10px 12px; background:var(--bg-subtle); border-radius:8px;">
+            <div class="field-label">當前登入帳號 / 顯示名稱</div>
+            <div id="settingsUserDisplay" class="num" style="font-size:15px; font-weight:700; margin-top:2px;">--</div>
+          </div>
+          <div style="padding:10px 12px; background:var(--bg-subtle); border-radius:8px;">
+            <div class="field-label">獨立資產池識別碼 (Isolated User ID)</div>
+            <div id="settingsUserId" class="num" style="font-size:13px; font-weight:600; color:var(--brand-blue); margin-top:2px;">--</div>
+          </div>
+        </div>
+      </div>
+
       <div class="grid-equal" style="margin-bottom: 14px;">
         <div class="card">
           <div class="card-header">
@@ -1474,9 +1647,15 @@
 
   <script>
     // =========================================================================
-    // Global State & User Preferences
+    // Global State, Multi-User Auth Session & Auto-Saved Credentials
     // =========================================================================
+    const STORAGE_TOKEN_KEY = 'alphamind_auth_token_v1';
+    const STORAGE_CRED_KEY = 'alphamind_saved_credentials_v1';
+
     const state = {
+      authMode: 'login',
+      authToken: localStorage.getItem(STORAGE_TOKEN_KEY) || '',
+      currentUser: null,
       activeTab: 'screener',
       selectedSector: 'ALL',
       selectedTheme: 'ALL',
@@ -1499,6 +1678,248 @@
       pollTimer: null,
       observer: null,
     };
+
+    // Intercept all /api/* requests to attach User Session Token & enforce Mandatory Login Gate
+    const _rawFetch = window.fetch.bind(window);
+    window.fetch = async function(input, init = {}) {
+      const urlStr = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+      const headers = new Headers(init.headers || {});
+      if (state.authToken && urlStr.includes('/api/')) {
+        headers.set('Authorization', `Bearer ${state.authToken}`);
+        headers.set('X-AlphaMind-Token', state.authToken);
+      }
+      const res = await _rawFetch(input, { ...init, headers });
+      if (res.status === 401 && !urlStr.includes('/api/auth/login') && !urlStr.includes('/api/auth/register')) {
+        showMandatoryLoginGate();
+      }
+      return res;
+    };
+
+    function showMandatoryLoginGate(errMsg = '') {
+      const gate = document.getElementById('authGateOverlay');
+      if (gate) gate.classList.remove('hidden');
+      const errBanner = document.getElementById('authErrorBanner');
+      if (errBanner) {
+        if (errMsg) {
+          errBanner.style.display = 'block';
+          errBanner.textContent = errMsg;
+        } else {
+          errBanner.style.display = 'none';
+        }
+      }
+      prefillSavedCredentials();
+    }
+
+    function hideMandatoryLoginGate() {
+      const gate = document.getElementById('authGateOverlay');
+      if (gate) gate.classList.add('hidden');
+    }
+
+    function switchAuthMode(mode) {
+      state.authMode = mode;
+      document.getElementById('authTabLoginBtn').classList.toggle('active', mode === 'login');
+      document.getElementById('authTabRegBtn').classList.toggle('active', mode === 'register');
+      document.getElementById('authRegisterFields').style.display = mode === 'register' ? 'block' : 'none';
+      document.getElementById('authSubmitBtn').textContent = mode === 'register'
+        ? '建立專屬帳戶並自動登入'
+        : '立即登入並載入個人資產池';
+      document.getElementById('authErrorBanner').style.display = 'none';
+    }
+
+    function saveCredentialsLocal(username, password) {
+      try {
+        const remember = document.getElementById('authRememberChk').checked;
+        if (!remember) {
+          localStorage.removeItem(STORAGE_CRED_KEY);
+          return;
+        }
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ u: username, p: password, ts: Date.now() }))));
+        localStorage.setItem(STORAGE_CRED_KEY, encoded);
+
+        // 同步觸發瀏覽器原生 PasswordCredential (若環境支援)
+        if (window.PasswordCredential && navigator.credentials && navigator.credentials.store) {
+          const cred = new window.PasswordCredential({ id: username, password, name: username });
+          navigator.credentials.store(cred).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Credential storage skipped:', e);
+      }
+    }
+
+    function loadSavedCredentialsLocal() {
+      try {
+        const raw = localStorage.getItem(STORAGE_CRED_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(decodeURIComponent(escape(atob(raw))));
+        if (parsed && parsed.u && parsed.p) return parsed;
+      } catch (e) {
+        return null;
+      }
+      return null;
+    }
+
+    function prefillSavedCredentials() {
+      const saved = loadSavedCredentialsLocal();
+      const uIn = document.getElementById('authUsernameInput');
+      const pIn = document.getElementById('authPasswordInput');
+      if (saved && uIn && pIn) {
+        uIn.value = saved.u;
+        pIn.value = saved.p;
+      } else if (uIn && !uIn.value) {
+        uIn.value = 'tang921118';
+        pIn.value = 'alpha8888';
+      }
+    }
+
+    async function quickFillDemoAccount(username, password) {
+      switchAuthMode('login');
+      document.getElementById('authUsernameInput').value = username;
+      document.getElementById('authPasswordInput').value = password;
+      document.getElementById('authRememberChk').checked = true;
+      await performLoginRequest(username, password);
+    }
+
+    async function submitAuthForm(ev) {
+      ev.preventDefault();
+      const username = document.getElementById('authUsernameInput').value.trim();
+      const password = document.getElementById('authPasswordInput').value;
+      if (!username || !password) return;
+
+      if (state.authMode === 'register') {
+        const displayName = document.getElementById('authDisplayNameInput').value.trim();
+        const initCash = parseFloat(document.getElementById('authInitCashInput').value) || 1500000;
+        await performRegisterRequest(username, password, displayName, initCash);
+      } else {
+        await performLoginRequest(username, password);
+      }
+    }
+
+    async function performLoginRequest(username, password) {
+      try {
+        const res = await _rawFetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          showMandatoryLoginGate(data.message || '帳號或密碼錯誤');
+          return false;
+        }
+        saveCredentialsLocal(username, password);
+        await onAuthSuccess(data);
+        return true;
+      } catch (e) {
+        showMandatoryLoginGate('連線伺服器失敗，請稍後再試');
+        return false;
+      }
+    }
+
+    async function performRegisterRequest(username, password, displayName, initialCashTwd) {
+      try {
+        const res = await _rawFetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            password,
+            display_name: displayName,
+            initial_cash_twd: initialCashTwd,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          showMandatoryLoginGate(data.message || '註冊失敗');
+          return false;
+        }
+        saveCredentialsLocal(username, password);
+        await onAuthSuccess(data);
+        return true;
+      } catch (e) {
+        showMandatoryLoginGate('註冊連線異常');
+        return false;
+      }
+    }
+
+    async function onAuthSuccess(authData) {
+      state.authToken = authData.token;
+      state.currentUser = authData.user;
+      localStorage.setItem(STORAGE_TOKEN_KEY, state.authToken);
+
+      // 載入該使用者的專屬策略偏好設定
+      const prefs = (authData.user && authData.user.strategy_prefs) || {};
+      if (prefs.atr_period) state.atrPeriod = prefs.atr_period;
+      if (prefs.atr_multiplier) state.atrMultiplier = prefs.atr_multiplier;
+      if (prefs.base_position_pct) state.basePositionPct = prefs.base_position_pct;
+      if (prefs.min_f_score) state.minFScore = prefs.min_f_score;
+      if (prefs.fee_discount) state.feeDiscount = prefs.fee_discount;
+
+      document.getElementById('cfgAtrPeriod').value = state.atrPeriod;
+      document.getElementById('cfgAtrMult').value = state.atrMultiplier;
+      document.getElementById('cfgBasePosPct').value = state.basePositionPct;
+      document.getElementById('cfgMinFScore').value = state.minFScore;
+      document.getElementById('cfgFeeDiscount').value = state.feeDiscount;
+
+      // 更新導覽列與設定頁面的使用者資訊
+      const uName = authData.user.display_name || authData.user.username;
+      document.getElementById('topbarUserName').textContent = uName;
+      const setDisp = document.getElementById('settingsUserDisplay');
+      const setUid = document.getElementById('settingsUserId');
+      if (setDisp) setDisp.textContent = `${uName} (@${authData.user.username})`;
+      if (setUid) setUid.textContent = `${authData.user.user_id} (專屬隔離帳本)`;
+
+      hideMandatoryLoginGate();
+
+      initViewportObserver();
+      await Promise.all([
+        loadOverview(),
+        loadScreener(),
+        loadPortfolio(),
+      ]);
+      if (state.activeTab === 'diagnosis') await loadStockDiagnosis(state.currentDiagSymbol);
+      if (state.activeTab === 'etf') await loadEtfHub();
+      updatePollingInterval();
+    }
+
+    function openSwitchAccountModal() {
+      showMandatoryLoginGate();
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch (e) {}
+      state.authToken = '';
+      state.currentUser = null;
+      localStorage.removeItem(STORAGE_TOKEN_KEY);
+      localStorage.removeItem(STORAGE_CRED_KEY);
+      document.getElementById('topbarUserName').textContent = '未登入';
+      showMandatoryLoginGate('您已安全登出，請重新登入以存取系統。');
+    }
+
+    async function bootstrapAuthAndApp() {
+      // 1. 優先以已儲存的 Session Token 驗證
+      if (state.authToken) {
+        try {
+          const res = await _rawFetch(`/api/auth/session?token=${encodeURIComponent(state.authToken)}`);
+          const data = await res.json();
+          if (data && data.authenticated && data.user) {
+            await onAuthSuccess(data);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. 若 Token 過期或不存在，但瀏覽器存有「自動記憶帳號密碼」，自動無感重新登入（免手動輸入）
+      const savedCred = loadSavedCredentialsLocal();
+      if (savedCred && savedCred.u && savedCred.p) {
+        const autoOk = await performLoginRequest(savedCred.u, savedCred.p);
+        if (autoOk) return;
+      }
+
+      // 3. 首次造訪或已主動登出：強制顯示全螢幕登入閘門
+      showMandatoryLoginGate();
+    }
 
     // =========================================================================
     // Instant Autocomplete Search Dropdown
@@ -2673,21 +3094,29 @@
       state.basePositionPct = parseFloat(document.getElementById('cfgBasePosPct').value) || 15.0;
       state.minFScore = parseInt(document.getElementById('cfgMinFScore').value, 10) || 6;
       state.feeDiscount = parseFloat(document.getElementById('cfgFeeDiscount').value) || 0.60;
+      const pollVal = parseInt(document.getElementById('cfgPollInterval').value, 10) || 10;
 
-      await postPortfolioAction({ action: 'update_cash', fee_discount: state.feeDiscount });
+      await postPortfolioAction({
+        action: 'update_cash',
+        fee_discount: state.feeDiscount,
+        strategy_prefs: {
+          atr_period: state.atrPeriod,
+          atr_multiplier: state.atrMultiplier,
+          base_position_pct: state.basePositionPct,
+          min_f_score: state.minFScore,
+          fee_discount: state.feeDiscount,
+          poll_interval_sec: pollVal,
+        },
+      });
       updatePollingInterval();
       switchTab('screener');
     }
 
     // =========================================================================
-    // Initialize App on Load
+    // Initialize App on Load (Enforce Mandatory Login & Auto-Credential Restore)
     // =========================================================================
     window.addEventListener('DOMContentLoaded', async () => {
-      initViewportObserver();
-      await loadOverview();
-      await loadScreener();
-      await loadPortfolio();
-      updatePollingInterval();
+      await bootstrapAuthAndApp();
     });
   </script>
 </body>

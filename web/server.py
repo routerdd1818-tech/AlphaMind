@@ -8,16 +8,19 @@ Supports:
 - Stock Analysis with K-Line Candlestick Pattern Recognition, Dual-Track Stops & Neutral AI (/api/stock-analysis, /api/dual-stops, /api/ai-synthesis)
 """
 
+import email.message
 import http.server
 import importlib.machinery
+import io
 import json
+import mimetypes
 import os
 import socketserver
 import sys
 import types
 import urllib.parse
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 
@@ -54,6 +57,7 @@ from alphamind.engine.tw_market_universe import (
     TaiwanMarketUniverseEngine,
 )
 from alphamind.engine.portfolio_alert_engine import PortfolioAndAlertEngine
+from alphamind.engine.auth_user_engine import MultiUserAuthAndStoreEngine, UserAccount
 from alphamind.engine.fugle_adapter import FugleMarketDataClient, load_fugle_credentials
 from alphamind.ai.devils_advocate import DevilsAdvocateAgent
 from alphamind.ai.structured_extractor import StructuredExtractor
@@ -82,8 +86,10 @@ class _SafeFugleWrapper:
 
 
 # Shared singleton engines across requests
+# - UNIVERSE_ENGINE (台股與全台灣 ETF 行情快取) 全站所有登入使用者共用，節省 API 額度
+# - AUTH_USER_ENGINE (使用者帳號認證與個人資產/持倉/自選股/提醒) 依 user_id 嚴格隔離
 UNIVERSE_ENGINE = TaiwanMarketUniverseEngine()
-PORTFOLIO_ENGINE = PortfolioAndAlertEngine()
+AUTH_USER_ENGINE = MultiUserAuthAndStoreEngine()
 PATTERN_ENGINE = CandlestickPatternEngine()
 FUGLE_ADAPTER = _SafeFugleWrapper()
 
@@ -175,22 +181,69 @@ def _generate_realistic_bars(symbol: str, current_price: float, kline_bias: str)
 
 
 class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
+    _wsgi_mode: bool = False
+    _wsgi_status: int = 200
+    _wsgi_headers: List[Tuple[str, str]] = []
+
     def __init__(self, *args, **kwargs):
+        self._wsgi_mode = False
+        self._wsgi_status = 200
+        self._wsgi_headers = []
         super().__init__(*args, directory=WEB_DIR, **kwargs)
 
     def log_message(self, format: str, *args: Any) -> None:
         # Keep console clean while serving rapid viewport polls
         pass
 
+    def send_response(self, code: int, message: str | None = None) -> None:
+        if getattr(self, "_wsgi_mode", False):
+            self._wsgi_status = int(code)
+            return
+        super().send_response(code, message)
+
+    def send_header(self, keyword: str, value: str) -> None:
+        if getattr(self, "_wsgi_mode", False):
+            self._wsgi_headers.append((str(keyword), str(value)))
+            return
+        super().send_header(keyword, value)
+
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-AlphaMind-Token")
+        if getattr(self, "_wsgi_mode", False):
+            return
         super().end_headers()
 
     def do_OPTIONS(self):
         self.send_response(200)
         self.end_headers()
+
+    def _extract_token(self, qs: Dict[str, List[str]] = None) -> str:
+        auth_hdr = self.headers.get("Authorization", "")
+        if auth_hdr.startswith("Bearer "):
+            return auth_hdr.replace("Bearer ", "").strip()
+        x_tok = self.headers.get("X-AlphaMind-Token", "").strip()
+        if x_tok:
+            return x_tok
+        if qs and "token" in qs and qs["token"]:
+            return qs["token"][0].strip()
+        return ""
+
+    def _require_auth_user(self, qs: Dict[str, List[str]] = None) -> UserAccount | None:
+        tok = self._extract_token(qs)
+        user = AUTH_USER_ENGINE.verify_session_token(tok)
+        if not user:
+            self._send_json(
+                {
+                    "error": "UNAUTHORIZED",
+                    "message": "此平台強制要求登入，請先登入您的專屬帳號以存取功能與個人資料。",
+                    "demo_accounts": AUTH_USER_ENGINE.list_demo_accounts_public(),
+                },
+                status_code=401,
+            )
+            return None
+        return user
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -198,33 +251,78 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 
         if parsed.path in ("/api/health", "/health"):
             self._send_json({"status": "ok", "service": "alphamind-api", "timestamp": datetime.now().isoformat()})
-        elif parsed.path == "/api/overview":
-            self._handle_overview()
-        elif parsed.path == "/api/stocks":
-            self._handle_stocks_list()
-        elif parsed.path == "/api/screener":
-            self._handle_screener(qs)
-        elif parsed.path == "/api/sectors":
-            self._handle_sectors()
-        elif parsed.path == "/api/etfs":
-            self._handle_etfs(qs)
-        elif parsed.path == "/api/portfolio":
-            self._handle_portfolio_get()
-        elif parsed.path == "/api/quotes/batch":
-            self._handle_batch_quotes(qs)
-        elif parsed.path == "/api/search":
-            self._handle_autocomplete_search(qs)
+        elif parsed.path == "/api/auth/session":
+            self._handle_auth_session(qs)
+        elif parsed.path.startswith("/api/"):
+            user = self._require_auth_user(qs)
+            if not user:
+                return
+            if parsed.path == "/api/overview":
+                self._handle_overview(user)
+            elif parsed.path == "/api/stocks":
+                self._handle_stocks_list()
+            elif parsed.path == "/api/screener":
+                self._handle_screener(qs)
+            elif parsed.path == "/api/sectors":
+                self._handle_sectors()
+            elif parsed.path == "/api/etfs":
+                self._handle_etfs(qs)
+            elif parsed.path == "/api/portfolio":
+                self._handle_portfolio_get(user)
+            elif parsed.path == "/api/quotes/batch":
+                self._handle_batch_quotes(qs)
+            elif parsed.path == "/api/search":
+                self._handle_autocomplete_search(qs)
+            else:
+                self._send_json({"error": "NOT_FOUND"}, status_code=404)
         else:
-            super().do_GET()
+            rel_path = parsed.path.lstrip("/") or "index.html"
+            target_file = os.path.abspath(os.path.join(WEB_DIR, rel_path))
+            if not target_file.startswith(os.path.abspath(WEB_DIR)) or os.path.isdir(target_file):
+                target_file = os.path.join(WEB_DIR, "index.html")
+            if not os.path.isfile(target_file):
+                target_file = os.path.join(WEB_DIR, "index.html")
+            if os.path.isfile(target_file):
+                ctype, _ = mimetypes.guess_type(target_file)
+                if not ctype:
+                    ctype = "text/html; charset=utf-8"
+                elif ctype.startswith("text/") or ctype == "application/javascript":
+                    ctype = f"{ctype}; charset=utf-8"
+                with open(target_file, "rb") as f:
+                    body_bytes = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body_bytes)))
+                self.end_headers()
+                self.wfile.write(body_bytes)
+            else:
+                self._send_json({"error": "NOT_FOUND"}, status_code=404)
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
         content_len = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
         try:
             payload = json.loads(body)
         except Exception:
             payload = {}
+
+        # 公開認證端點（登入 / 註冊 / 登出）
+        if parsed.path == "/api/auth/login":
+            self._handle_auth_login(payload)
+            return
+        elif parsed.path == "/api/auth/register":
+            self._handle_auth_register(payload)
+            return
+        elif parsed.path == "/api/auth/logout":
+            self._handle_auth_logout(qs)
+            return
+
+        # 強制驗證：所有其他業務 API 必須登入才可呼叫
+        user = self._require_auth_user(qs)
+        if not user:
+            return
 
         if parsed.path == "/api/stock-analysis":
             self._handle_stock_analysis(payload)
@@ -233,23 +331,77 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == "/api/ai-synthesis":
             self._handle_ai_synthesis(payload)
         elif parsed.path == "/api/portfolio/action":
-            self._handle_portfolio_action(payload)
+            self._handle_portfolio_action(user, payload)
         elif parsed.path == "/api/backtest":
             self._handle_backtest(payload)
         else:
             self.send_response(404)
             self.end_headers()
 
-    def _send_json(self, data: Any):
-        self.send_response(200)
+    def _send_json(self, data: Any, status_code: int = 200):
+        self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
 
     # --------------------------------------------------------------------------
-    # API 1: 全局戰情 (6國總經燈號 + 產業/概念資金流向排行)
+    # API 0: 多使用者強制認證與持久化自動登入 (/api/auth/*)
     # --------------------------------------------------------------------------
-    def _handle_overview(self):
+    def _handle_auth_login(self, payload: Dict[str, Any]):
+        username = str(payload.get("username", "")).strip()
+        password = str(payload.get("password", ""))
+        ok, msg, auth_data = AUTH_USER_ENGINE.login_user(username, password)
+        if not ok or not auth_data:
+            self._send_json({"ok": False, "message": msg}, status_code=401)
+            return
+        self._send_json({"ok": True, "message": msg, **auth_data})
+
+    def _handle_auth_register(self, payload: Dict[str, Any]):
+        username = str(payload.get("username", "")).strip()
+        password = str(payload.get("password", ""))
+        display_name = str(payload.get("display_name", "")).strip()
+        email = str(payload.get("email", "")).strip()
+        initial_cash = float(payload.get("initial_cash_twd") or 1_000_000.0)
+        ok, msg, auth_data = AUTH_USER_ENGINE.register_user(
+            username=username,
+            password=password,
+            display_name=display_name,
+            email=email,
+            initial_cash_twd=initial_cash,
+        )
+        if not ok or not auth_data:
+            self._send_json({"ok": False, "message": msg}, status_code=400)
+            return
+        self._send_json({"ok": True, "message": msg, **auth_data})
+
+    def _handle_auth_session(self, qs: Dict[str, List[str]]):
+        tok = self._extract_token(qs)
+        user = AUTH_USER_ENGINE.verify_session_token(tok)
+        if not user:
+            self._send_json(
+                {
+                    "authenticated": False,
+                    "demo_accounts": AUTH_USER_ENGINE.list_demo_accounts_public(),
+                }
+            )
+            return
+        self._send_json(
+            {
+                "authenticated": True,
+                **AUTH_USER_ENGINE._format_auth_response(user, tok),
+                "demo_accounts": AUTH_USER_ENGINE.list_demo_accounts_public(),
+            }
+        )
+
+    def _handle_auth_logout(self, qs: Dict[str, List[str]]):
+        tok = self._extract_token(qs)
+        AUTH_USER_ENGINE.logout_token(tok)
+        self._send_json({"ok": True, "message": "已安全登出"})
+
+    # --------------------------------------------------------------------------
+    # API 1: 全局戰情 (6國總經燈號 + 產業/概念資金流向排行) — 行情資料全站共用
+    # --------------------------------------------------------------------------
+    def _handle_overview(self, user: UserAccount):
         rates_fx, expectations, dxy = GlobalMacroCollector.get_latest_snapshot()
         macro_engine = GlobalMacroEngine()
         macro_res = macro_engine.evaluate(rates_fx, expectations, dxy)
@@ -351,21 +503,34 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 
     # --------------------------------------------------------------------------
     # API 4: 資產計算、持倉管理、自選股與目標價/型態轉變提醒 (/api/portfolio)
+    #        每位使用者的資產、持倉、自選股、策略設定完全獨立隔離；股票與 ETF 行情共用
     # --------------------------------------------------------------------------
-    def _handle_portfolio_get(self):
-        self._send_json(PORTFOLIO_ENGINE.evaluate_portfolio_and_alerts(UNIVERSE_ENGINE))
+    def _handle_portfolio_get(self, user: UserAccount):
+        user_engine = AUTH_USER_ENGINE.get_user_portfolio_engine(user.user_id)
+        data = user_engine.evaluate_portfolio_and_alerts(UNIVERSE_ENGINE)
+        data["user_profile"] = {
+            "user_id": user.user_id,
+            "username": user.username,
+            "display_name": user.display_name,
+            "role": user.role,
+            "strategy_prefs": user.strategy_prefs,
+        }
+        self._send_json(data)
 
-    def _handle_portfolio_action(self, payload: Dict[str, Any]):
+    def _handle_portfolio_action(self, user: UserAccount, payload: Dict[str, Any]):
+        user_engine = AUTH_USER_ENGINE.get_user_portfolio_engine(user.user_id)
         action = payload.get("action", "")
         if action == "update_cash":
-            PORTFOLIO_ENGINE.update_cash_and_settings(
+            user_engine.update_cash_and_settings(
                 cash_twd=payload.get("cash_twd"),
                 fee_discount=payload.get("fee_discount"),
             )
+            if payload.get("strategy_prefs") and isinstance(payload["strategy_prefs"], dict):
+                AUTH_USER_ENGINE.update_user_strategy_prefs(user.user_id, payload["strategy_prefs"])
         elif action == "upsert_position":
             sym = str(payload.get("symbol", "2330")).strip().upper()
             meta = _resolve_stock_meta(sym)
-            PORTFOLIO_ENGINE.upsert_position(
+            user_engine.upsert_position(
                 symbol=sym,
                 name=str(payload.get("name") or meta["name"]),
                 shares=int(payload.get("shares", 1000)),
@@ -375,19 +540,27 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
                 notes=str(payload.get("notes", "")),
             )
         elif action == "remove_position":
-            PORTFOLIO_ENGINE.remove_position(str(payload.get("symbol", "")))
+            user_engine.remove_position(str(payload.get("symbol", "")))
         elif action == "add_watchlist":
             sym = str(payload.get("symbol", "2330")).strip().upper()
             meta = _resolve_stock_meta(sym)
-            PORTFOLIO_ENGINE.add_watchlist_item(
+            user_engine.add_watchlist_item(
                 symbol=sym,
                 name=str(payload.get("name") or meta["name"]),
                 target_buy_price=float(payload["target_buy_price"]) if payload.get("target_buy_price") else None,
             )
         elif action == "remove_watchlist":
-            PORTFOLIO_ENGINE.remove_watchlist_item(str(payload.get("symbol", "")))
+            user_engine.remove_watchlist_item(str(payload.get("symbol", "")))
 
-        self._send_json(PORTFOLIO_ENGINE.evaluate_portfolio_and_alerts(UNIVERSE_ENGINE))
+        data = user_engine.evaluate_portfolio_and_alerts(UNIVERSE_ENGINE)
+        data["user_profile"] = {
+            "user_id": user.user_id,
+            "username": user.username,
+            "display_name": user.display_name,
+            "role": user.role,
+            "strategy_prefs": user.strategy_prefs,
+        }
+        self._send_json(data)
 
     # --------------------------------------------------------------------------
     # API 5: 畫面可視範圍按需即時報價更新 (/api/quotes/batch)
@@ -850,6 +1023,73 @@ class AlphaMindApiHandler(http.server.SimpleHTTPRequestHandler):
 class _ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
     daemon_threads = True
+
+
+# Vercel BaseHTTPRequestHandler entrypoint alias
+handler = AlphaMindApiHandler
+
+
+def wsgi_app(environ: Dict[str, Any], start_response: Callable[[str, List[Tuple[str, str]]], Any]) -> Iterable[bytes]:
+    """
+    Standard WSGI callable (`app` / `application`) for Vercel Python Runtime, Gunicorn, etc.
+    Routes all HTTP requests (`GET`, `POST`, `OPTIONS`) through `AlphaMindApiHandler`.
+    """
+    h = object.__new__(AlphaMindApiHandler)
+    h._wsgi_mode = True
+    h._wsgi_status = 200
+    h._wsgi_headers = []
+    h.directory = WEB_DIR
+
+    method = str(environ.get("REQUEST_METHOD", "GET")).upper()
+    path_info = str(environ.get("PATH_INFO", "/") or "/")
+    query_string = str(environ.get("QUERY_STRING", "") or "")
+    h.path = f"{path_info}?{query_string}" if query_string else path_info
+    h.command = method
+
+    msg = email.message.Message()
+    if environ.get("CONTENT_TYPE"):
+        msg["Content-Type"] = str(environ["CONTENT_TYPE"])
+    if environ.get("CONTENT_LENGTH"):
+        msg["Content-Length"] = str(environ["CONTENT_LENGTH"])
+    for k, v in environ.items():
+        if k.startswith("HTTP_") and v is not None:
+            header_name = k[5:].replace("_", "-")
+            msg[header_name] = str(v)
+    h.headers = msg
+
+    try:
+        content_len = int(environ.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        content_len = 0
+    wsgi_input = environ.get("wsgi.input")
+    req_bytes = wsgi_input.read(content_len) if (wsgi_input and content_len > 0) else b""
+    h.rfile = io.BytesIO(req_bytes)
+    h.wfile = io.BytesIO()
+
+    if method == "OPTIONS":
+        h.do_OPTIONS()
+    elif method == "POST":
+        h.do_POST()
+    else:
+        h.do_GET()
+
+    status_map = {
+        200: "200 OK",
+        201: "201 Created",
+        204: "204 No Content",
+        400: "400 Bad Request",
+        401: "401 Unauthorized",
+        403: "403 Forbidden",
+        404: "404 Not Found",
+        500: "500 Internal Server Error",
+    }
+    status_line = status_map.get(h._wsgi_status, f"{h._wsgi_status} OK")
+    start_response(status_line, h._wsgi_headers)
+    return [h.wfile.getvalue()]
+
+
+app = wsgi_app
+application = wsgi_app
 
 
 def start_server():
