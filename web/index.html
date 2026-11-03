@@ -1133,7 +1133,7 @@
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <h2 id="diagTitle" style="font-size:20px; font-weight:700;">2330 台積電</h2>
               <span id="diagSectorBadge" class="badge badge-blue">半導體</span>
-              <span id="diagActionBadge" class="badge badge-up">STRONG_BUY</span>
+              <span id="diagActionBadge" class="badge badge-up">強力買進</span>
             </div>
             <div id="diagThemeTags" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
           </div>
@@ -1902,6 +1902,40 @@
     const STORAGE_CRED_KEY = 'alphamind_saved_credentials_v1';
     const STORAGE_API_BASE_KEY = 'alphamind_api_base_url_v1';
 
+    // 繁體中文化多空傾向與交易決策映射字典
+    const ACTION_ZH_MAP = {
+      STRONG_BUY: '強力買進',
+      BUY: '建議買進',
+      ACCUMULATE: '分批承接',
+      WATCHLIST: '列入觀察',
+      WAIT_AND_SEE: '觀望等待',
+      HOLD: '續抱持倉',
+      REDUCE: '調節減碼',
+      STOP_LOSS: '停損出場',
+      PROHIBIT_LONG: '嚴禁做多',
+      NEUTRAL: '中立觀望',
+    };
+
+    const BIAS_ZH_MAP = {
+      STRONG_BULLISH: '強烈偏多',
+      BULLISH: '多頭排列',
+      LEAN_BULLISH: '震盪偏多',
+      NEUTRAL: '中性整理',
+      LEAN_BEARISH: '震盪偏空',
+      BEARISH: '空頭排列',
+      STRONG_BEARISH: '強烈偏空',
+    };
+
+    function formatActionZh(act) {
+      if (!act) return '--';
+      return ACTION_ZH_MAP[String(act).trim().toUpperCase()] || act;
+    }
+
+    function formatBiasZh(bias) {
+      if (!bias) return '中性整理';
+      return BIAS_ZH_MAP[String(bias).trim().toUpperCase()] || bias;
+    }
+
     // 自動偵測或讀取自訂後端 API 網址：
     // - 本機與區網直連 server.py 時為空字串 '' (同源自動連線)
     // - 若前端部署於 Vercel，可由網址參數 ?api=https://xxx.onrender.com 或 localStorage 自動指向雲端 Python 後端
@@ -2513,7 +2547,7 @@
                 <div style="color:var(--text-muted);">停損 <span class="text-down">${item.stop_loss}</span> / 目標 <span class="text-up">${item.consensus_target}</span></div>
               </td>
               <td class="num" style="font-weight:700;">${item.risk_reward}x</td>
-              <td><span class="badge ${actBadgeClass}">${item.gate_action}</span></td>
+              <td><span class="badge ${actBadgeClass}">${formatActionZh(item.gate_action)}</span></td>
               <td onclick="event.stopPropagation();">
                 <div style="display:flex; gap:4px;">
                   <button class="btn btn-ghost btn-xs" onclick="quickAddWatchlist('${item.symbol}', '${item.name}', ${item.price})">+自選</button>
@@ -2536,7 +2570,7 @@
                 <div>
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span class="num" style="font-size:16px; font-weight:700;">${item.symbol} ${item.name}</span>
-                    <span class="badge ${actBadgeClass}">${item.gate_action}</span>
+                    <span class="badge ${actBadgeClass}">${formatActionZh(item.gate_action)}</span>
                   </div>
                   <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
                     ${item.primary_sector}・${(item.theme_tags || []).slice(0, 2).join(' / ')}
@@ -2607,7 +2641,7 @@
 
         document.getElementById('diagTitle').textContent = `${data.symbol} ${data.name}`;
         document.getElementById('diagSectorBadge').textContent = `${data.market}・${data.primary_sector}`;
-        document.getElementById('diagActionBadge').textContent = `${data.decision.action} (建議部位 ${data.decision.position_pct}%)`;
+        document.getElementById('diagActionBadge').textContent = `${formatActionZh(data.decision.action)} (建議部位 ${data.decision.position_pct}%)`;
         document.getElementById('diagThemeTags').textContent = `概念族群：${(data.theme_tags || []).join(' / ')} | F-Score ${data.valuation.f_score}/9 | ROE ${data.valuation.roe}% | 殖利率 ${data.valuation.dividend_yield}%`;
 
         const priceEl = document.getElementById('diagPrice');
@@ -4313,7 +4347,7 @@
         document.getElementById('drawerStockLiveMeta').textContent = metaText;
 
         // AI Summary Banner
-        document.getElementById('drawerDecisionBadge').textContent = data.decision.action;
+        document.getElementById('drawerDecisionBadge').textContent = formatActionZh(data.decision.action);
         document.getElementById('drawerDecisionBadge').className = `badge ${data.decision.action === 'STRONG_BUY' ? 'badge-up' : 'badge-blue'}`;
         document.getElementById('drawerPositionAdvice').textContent = `建議配置 ${data.decision.position_pct}%`;
         const pat = data.pattern_analysis;

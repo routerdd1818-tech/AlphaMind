@@ -130,12 +130,34 @@ class NeutralAIAgent:
             market_bias = "NEUTRAL"
             conf = 75.0
 
+        BIAS_ZH_MAP = {
+            "STRONG_BULLISH": "強烈偏多",
+            "BULLISH": "多頭排列",
+            "LEAN_BULLISH": "震盪偏多",
+            "NEUTRAL": "中性整理",
+            "LEAN_BEARISH": "震盪偏空",
+            "BEARISH": "空頭排列",
+            "STRONG_BEARISH": "強烈偏空",
+        }
+        ACTION_ZH_MAP = {
+            "STRONG_BUY": "強力買進",
+            "BUY": "分批布局",
+            "ACCUMULATE": "分批承接",
+            "WATCHLIST": "列入觀察",
+            "HOLD": "續抱持倉",
+            "REDUCE": "調節減碼",
+            "STOP_LOSS": "停損出場",
+            "PROHIBIT_LONG": "嚴禁做多",
+        }
+        bias_zh = BIAS_ZH_MAP.get(market_bias, market_bias)
+        action_zh = ACTION_ZH_MAP.get(str(decision.action.value), str(decision.action.value))
+
         # 7. 生成客觀研判陳述
         neutral_summary = (
-            f"標的 {name} ({symbol}) 當前呈現「{market_bias}」格局。"
+            f"標的 {name} ({symbol}) 當前呈現「{bias_zh}」格局。"
             f"利多面具備 {len(bull_catalysts)} 項量化支撐，以產業護城河與財務評分為主力動能；"
             f"惟空方亦存在 {len(bear_risks)} 項潛在隱憂，包含估值位階與總經乘數限制。"
-            f"決策狀態機目前評定動作為【{decision.action.value}】，整體配置不宜超過總資產之 {decision.recommended_position_pct}%。"
+            f"決策狀態機目前評定動作為【{action_zh}】，整體配置不宜超過總資產之 {decision.recommended_position_pct}%。"
             f"操作上嚴格遵守價格紀律，絕不追高擴大曝險。"
         )
 
